@@ -1,14 +1,17 @@
-# Feature 5: L1 Instruction Cache (I-Cache)
+# Feature 5: Hardware Divider (RV32M)
 
 ## Objectives & Scope
-Integration of a high-speed L1 Instruction Cache between the Fetch (IF) stage and main memory.
+Integration of a multi-cycle hardware divider into the Execute (EX) stage to support integer division and remainder instructions from the standard RISC-V "M" extension.
 
-## Architecture Specifications
-- **Organization**: Direct-mapped or 2-way set-associative cache
-- **Capacity**: 1 KB – 4 KB (parameterizable cache size)
-- **Line Size**: 16 bytes (4 words per cache block) / 32 bytes
-- **Hit Latency**: Single-cycle hit response to instruction fetch
-- **Miss Handling**:
-  - Memory stall controller freezing the Fetch/Decode pipeline
-  - Block refill burst transfer from memory
-  - Hit/Miss status monitoring for performance analysis
+## Supported Instructions
+- `DIV`: Signed integer division ($rs1 / rs2$)
+- `DIVU`: Unsigned integer division ($rs1 / rs2$)
+- `REM`: Signed remainder ($rs1 \pmod{rs2}$)
+- `REMU`: Unsigned remainder ($rs1 \pmod{rs2}$)
+
+## Microarchitecture & Integration
+- Multi-cycle non-restoring / Radix-2 state machine (32 clock cycle latency)
+- Dynamic stall controller asserting `divider_stall` to freeze the pipeline during computation
+- Corner cases handled:
+  - Division by zero ($rs2 == 0$): sets quotient to $-1$ or $2^{32}-1$, remainder to dividend
+  - Signed overflow ($\text{INT\_MIN} / -1$): sets quotient to $\text{INT\_MIN}$, remainder to $0$

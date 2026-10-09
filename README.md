@@ -6,13 +6,15 @@
 ---
 
 ## Project Overview
-This repository contains the complete design, implementation, verification, and full-system integration of a high-performance **5-Stage Pipelined RV32IM RISC-V Processor Core** with extended arithmetic, cache memory hierarchy, dynamic branch prediction, and system coprocessors.
+This repository contains the design, implementation, verification, and full-system integration of an advanced **5-Stage Pipelined RV32I Processor Core** extended with hardware multiplication/division, single-precision IEEE 754 floating-point math, direct-mapped L1 instruction and data caches, static branch prediction, passive hardware performance counters, and the Zbb bit-manipulation extension.
 
-All 9 features are designed to integrate seamlessly into a unified pipeline architecture:
+---
+
+## Integrated Architecture Diagram
 
 ```text
        +-------------------------------------------------------------+
-       |               Feature 6: Dynamic Branch Predictor           |
+       |         Feature 7: Branch Prediction (Static 32-entry BTB)  |
        +-------------------------------------------------------------+
                                       | (Predicted PC / Flush Recovery)
                                       v
@@ -22,52 +24,54 @@ All 9 features are designed to integrate seamlessly into a unified pipeline arch
        |                                            |                       |                   |
        v                                            |                       v                   v
 +--------------+                                    |                +--------------+    +--------------+
-|  Feature 5:  |                                    |                |  Feature 7:  |    |  Reg File /  |
+|  Feature 3:  |                                    |                |  Feature 6:  |    |  Reg File /  |
 |  L1 I-Cache  |                                    |                |  L1 D-Cache  |    |  Writeback   |
+| (Direct-Map) |                                    |                | (Direct-Map) |    |              |
 +--------------+                                    |                +--------------+    +--------------+
                                                     |
              +--------------------------------------+--------------------------------------+
              |                      |                      |                      |        |
              v                      v                      v                      v        v
       +--------------+       +--------------+       +--------------+       +------------+ +-------------+
-      |  Feature 2:  |       |  Feature 3:  |       |  Feature 4:  |       | Feature 9: | | Feature 8:  |
-      |   Hardware   |       |   Hardware   |       |   IEEE 754   |       |    Bit     | | Performance |
-      |  Multiplier  |       |   Divider    |       |     FPU      |       |Manipulation| |  Counters   |
+      |  Feature 2:  |       |  Feature 4:  |       |  Feature 5:  |       | Feature 9: | | Feature 8:  |
+      |   Hardware   |       |   IEEE 754   |       |   Hardware   |       |    Bit-    | | Performance |
+      |  Multiplier  |       |     FPU      |       |   Divider    |       |Manipulation| |  Counters   |
+      |   (RV32M)    |       |   (RV32F)    |       |   (RV32M)    |       |   (Zbb)    | |(Passive CSR)|
       +--------------+       +--------------+       +--------------+       +------------+ +-------------+
 ```
 
 ---
 
-## Complete 9-Feature Architecture Roadmap
+## Project Feature Breakdown & Execution Order
 
-| Feature | Directory | Module / Extension | Integration Stage | Description & Deliverables |
-|---|---|---|---|---|
-| **Feature 1** | [`feature_1/`](feature_1/) | **5-Stage Pipeline Upgrade** | All Stages (IF–WB) | 5-stage core, Hazard Detection & Forwarding Unit, C test suite, cycle-by-cycle timing analyses |
-| **Feature 2** | [`feature_2/`](feature_2/) | **Hardware Multiplier** | Execute (EX) | Radix-4 Booth / DSP multiplier supporting `MUL`, `MULH`, `MULHSU`, `MULHU` |
-| **Feature 3** | [`feature_3/`](feature_3/) | **Hardware Divider** | Execute (EX) | Multi-cycle Radix-2 non-restoring divider (`DIV`, `DIVU`, `REM`, `REMU`) with stall controller |
-| **Feature 4** | [`feature_4/`](feature_4/) | **IEEE754 FPU** | Execute (EX) & RegFile | Single-precision (32-bit) Floating Point Unit (`FADD`, `FSUB`, `FMUL`, `FDIV`, `FCVT`, `FLW`, `FSW`) |
-| **Feature 5** | [`feature_5/`](feature_5/) | **L1 Instruction Cache** | Fetch (IF) | Direct-mapped / 2-way set-associative I-Cache with hit/miss controller and burst refill |
-| **Feature 6** | [`feature_6/`](feature_6/) | **Branch Prediction** | Fetch & Execute | 32-entry Branch Target Buffer (BTB) + 2-bit saturating counter BHT to reduce branch penalty |
-| **Feature 7** | [`feature_7/`](feature_7/) | **L1 Data Cache** | Memory (MEM) | D-Cache with write-through/write-back policy and byte-enable alignment |
-| **Feature 8** | [`feature_8/`](feature_8/) | **Performance Counters** | System / CSRs | Hardware performance monitor for cycles, retired instructions, branch mispredicts, and cache misses |
-| **Feature 9** | [`feature_9/`](feature_9/) | **Bit Manipulation** | Execute (EX) ALU | RV32B extension (Zba, Zbb, Zbs: `CLZ`, `CTZ`, `CPOP`, `ROL`, `ROR`, `ANDN`, `XNOR`, etc.) |
+| # | Directory | Feature Name | Description & Deliverables |
+|:---:|---|---|---|
+| **1** | [`feature_1/`](feature_1/) | **5-Stage Pipeline: with Hazard Detection and Forwarding** | **Completed & Verified**: 5-stage core (`IF`, `ID`, `EX`, `MEM`, `WB`), Hazard Detection & Forwarding Unit, C test suite, cycle-by-cycle timing analyses |
+| **2** | [`feature_2/`](feature_2/) | **Hardware Multiplier** | Radix-4 Booth / DSP multiplier supporting `MUL`, `MULH`, `MULHSU`, `MULHU` integrated in the EX stage |
+| **3** | [`feature_3/`](feature_3/) | **L1 I-Cache: Direct-Mapped** | Direct-mapped L1 Instruction Cache with single-cycle hit latency and burst memory refill FSM |
+| **4** | [`feature_4/`](feature_4/) | **IEEE754 FPU (FADD.S, FSUB.S, FMUL.S, FDIV.S)** | Single-precision 32-bit Floating Point Unit with dedicated 32-entry FP register file and stall control |
+| **5** | [`feature_5/`](feature_5/) | **Hardware Divider** | Multi-cycle Radix-2 non-restoring hardware divider for `DIV`, `DIVU`, `REM`, `REMU` with stall handshaking |
+| **6** | [`feature_6/`](feature_6/) | **L1 D-Cache: Direct-Mapped** | Direct-mapped L1 Data Cache with write-through/write-back policy and byte alignment support (`SB`, `SH`, `SW`) |
+| **7** | [`feature_7/`](feature_7/) | **Branch Prediction: Static 32-Entry BTB** | Static 32-entry Branch Target Buffer (BTB) to eliminate control hazard penalty on predicted branches |
+| **8** | [`feature_8/`](feature_8/) | **Performance Counters: Passive CSRs** | Hardware performance monitoring CSRs (`cycle`, `instret`, stall counter, branch mispredict, cache misses) |
+| **9** | [`feature_9/`](feature_9/) | **Bit-Manipulation (Zbb)** | Standard RISC-V Zbb instructions: `CLZ`, `CTZ`, `CPOP`, `MIN`/`MAX`, `ROL`/`ROR`, `ANDN`, `ORN`, `XNOR` |
 
 ---
 
 ## Verification & Simulation Flow
 
-Testbenches and automation scripts are configured for **Vivado Simulator (`xvlog`, `xelab`, `xsim`)**:
+All modules and integration testbenches are configured for **Vivado Simulator (`xvlog`, `xelab`, `xsim`)**:
 
 ```bash
-# 1. Automated multi-test runner from root
+# 1. Run all bare-metal C benchmark tests
 python run_c_tests.py all
 
-# 2. Run individual C tests on the 5-stage core
+# 2. Run individual C test programs
 python run_c_tests.py addition
 python run_c_tests.py fibonacci
 python run_c_tests.py sort
 
-# 3. Vivado simulation via Makefile
+# 3. Simulate via Makefile
 cd feature_1/simulation
 make all
 ```

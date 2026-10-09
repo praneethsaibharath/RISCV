@@ -1,12 +1,17 @@
-# Feature 7: L1 Data Cache (D-Cache)
+# Feature 7: Branch Prediction (Static 32-Entry BTB)
 
 ## Objectives & Scope
-Integration of an L1 Data Cache between the Memory (MEM) stage and background main memory hierarchy.
+Integration of a hardware **32-Entry Branch Target Buffer (BTB)** into the Fetch (IF) stage to eliminate the 2-cycle control hazard penalty on unconditional jumps and predicted-taken branches.
 
 ## Architectural Specifications
-- **Organization**: Direct-mapped or 2-way set-associative cache
-- **Write Policy**: Write-through with write-buffer or Write-back with dirty bits
-- **Byte Alignment Support**: Byte, half-word, and word write enables (`SB`, `SH`, `SW`)
+- **Table Capacity**: 32 entries (address-indexed with tag validation)
+- **Entry Fields**:
+  - `Valid Bit`: Indicates active cache entry
+  - `Tag`: Instruction PC upper address bits
+  - `Target PC`: Pre-computed target destination address
+- **Static Prediction Policy**:
+  - Unconditional jumps (`JAL`) always predicted taken
+  - Conditional branches predicted using BTB hit status / static backwards-taken forward-not-taken heuristic
 - **Pipeline Interconnect**:
-  - Interlocks Memory stage on cache miss via `dcache_stall`
-  - Coherence / serialization with I-Cache during memory refills
+  - **Fetch (IF)**: Searches BTB in parallel with instruction fetch; redirects PC on BTB hit
+  - **Execute (EX)**: Resolves actual branch target and direction; updates or allocates BTB entry on misprediction and triggers 2-cycle recovery flush

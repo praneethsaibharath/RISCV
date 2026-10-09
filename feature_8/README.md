@@ -1,16 +1,20 @@
-# Feature 8: Hardware Performance Counters
+# Feature 8: Performance Counters (Passive CSRs)
 
 ## Objectives & Scope
-Integration of standard RISC-V hardware performance monitoring registers (HPM / CSR counters) to profile pipeline execution, cache efficiency, and hazard penalties.
+Integration of passive hardware performance monitoring Control and Status Registers (CSRs) to track clock cycles, instruction throughput, and architectural hazard events without disrupting pipeline flow.
 
-## Counters Implemented (64-bit / 32-bit registers)
-- `cycle`: Total elapsed clock cycles
-- `instret`: Number of instructions retired in the writeback stage
-- `stall_cycles`: Total pipeline stall cycles caused by load-use dependencies, divider, or cache misses
-- `branch_count`: Total branch instructions executed
-- `branch_mispredict`: Number of branch mispredictions detected
-- `icache_miss`: L1 Instruction Cache miss events
-- `dcache_miss`: L1 Data Cache miss events
+## Implemented Passive Performance Registers
+- `cycle` / `cycleh`: 64-bit counter tracking elapsed clock cycles
+- `instret` / `instreth`: 64-bit counter tracking instructions successfully retired in the Writeback (WB) stage
+- `hpmcounter3`: Total pipeline stall cycles (load-use stalls, divider stalls, cache misses)
+- `hpmcounter4`: Total branch instructions executed
+- `hpmcounter5`: Total branch mispredictions
+- `hpmcounter6`: L1 Instruction Cache miss counter
+- `hpmcounter7`: L1 Data Cache miss counter
 
-## Software & Diagnostic Access
-- Readable via `RDCYCLE`, `RDTIME`, `RDINSTRET` (CSR `0xC00`, `0xC01`, `0xC02`) or memory-mapped diagnostic ports for real-time profiling.
+## Access Interface
+- Read-accessible via standard RISC-V instructions:
+  - `csrr rd, cycle` (CSR address `0xC00`)
+  - `csrr rd, time` (CSR address `0xC01`)
+  - `csrr rd, instret` (CSR address `0xC02`)
+- Passive read-only monitoring: counters update in hardware automatically on every relevant pipeline event.

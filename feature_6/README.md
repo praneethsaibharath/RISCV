@@ -1,17 +1,15 @@
-# Feature 6: Dynamic Branch Prediction
+# Feature 6: L1 Data Cache (Direct-Mapped)
 
 ## Objectives & Scope
-Integration of dynamic branch prediction logic to mitigate the 2-cycle control hazard penalty in the 5-stage pipeline.
+Integration of a high-speed, direct-mapped L1 Data Cache between the Memory (MEM) stage and background data memory to minimize memory access latencies.
 
-## Architectural Components
-- **Branch Target Buffer (BTB)**: Cache mapping branch instruction PCs to their target addresses.
-- **Branch History Table (BHT)**: Array of 2-bit saturating counters:
-  - `00`: Strongly Not Taken
-  - `01`: Weakly Not Taken
-  - `10`: Weakly Taken
-  - `11`: Strongly Taken
-- **Speculative Fetch**: Fetch stage queries BTB & BHT on every clock cycle.
-- **Misprediction Recovery**:
-  - Validated in the Execute (EX) stage.
-  - On misprediction: 2-cycle flush triggered, PC redirected, BHT counter updated.
-  - On correct prediction: Zero branch bubble penalty incurred.
+## Architecture Specifications
+- **Organization**: Direct-Mapped Cache
+- **Capacity**: 1 KB – 4 KB (parameterizable words per line, number of cache lines)
+- **Line Size**: 16 bytes (4 words per block) / 32 bytes (8 words per block)
+- **Write Policy**: Write-through with write-buffer or Write-back with dirty bits
+- **Byte Alignment Support**: Byte, half-word, and word write masking (`SB`, `SH`, `SW`)
+- **Miss Handling**:
+  - Memory stage interlock: asserts `dcache_stall` to freeze earlier pipeline stages
+  - Burst line refill from background main memory on read miss
+  - Cache hit detection and single-cycle read/write access
