@@ -1,41 +1,73 @@
-# Pipelined RV32IM RISC-V Core with L1 Cache Hierarchy and Neural Network MAC Coprocessor
+# Pipelined RV32IM RISC-V Core with Advanced Arithmetic, Cache Hierarchy, and System Extensions
 
 **Group Number:** 13  
 **Repository:** https://github.com/praneethsaibharath/RISCV
 
+---
+
 ## Project Overview
-This repository contains the design, implementation, and verification of an advanced 5-stage pipelined RV32IM RISC-V processor core targeted for FPGA synthesis on Xilinx Nexys boards. It features integrated hazard detection, operand forwarding, direct-mapped L1 instruction and data caches, hardware multiplication/division, and a dedicated 64-bit Neural Network MAC coprocessor.
+This repository contains the complete design, implementation, verification, and full-system integration of a high-performance **5-Stage Pipelined RV32IM RISC-V Processor Core** with extended arithmetic, cache memory hierarchy, dynamic branch prediction, and system coprocessors.
+
+All 9 features are designed to integrate seamlessly into a unified pipeline architecture:
+
+```text
+       +-------------------------------------------------------------+
+       |               Feature 6: Dynamic Branch Predictor           |
+       +-------------------------------------------------------------+
+                                      | (Predicted PC / Flush Recovery)
+                                      v
++--------------+    +--------------+    +-----------------------+    +--------------+    +--------------+
+|  Fetch (IF)  | -> | Decode (ID)  | -> |     Execute (EX)      | -> | Memory (MEM) | -> |Writeback (WB)|
++--------------+    +--------------+    +-----------------------+    +--------------+    +--------------+
+       |                                            |                       |                   |
+       v                                            |                       v                   v
++--------------+                                    |                +--------------+    +--------------+
+|  Feature 5:  |                                    |                |  Feature 7:  |    |  Reg File /  |
+|  L1 I-Cache  |                                    |                |  L1 D-Cache  |    |  Writeback   |
++--------------+                                    |                +--------------+    +--------------+
+                                                    |
+             +--------------------------------------+--------------------------------------+
+             |                      |                      |                      |        |
+             v                      v                      v                      v        v
+      +--------------+       +--------------+       +--------------+       +------------+ +-------------+
+      |  Feature 2:  |       |  Feature 3:  |       |  Feature 4:  |       | Feature 9: | | Feature 8:  |
+      |   Hardware   |       |   Hardware   |       |   IEEE 754   |       |    Bit     | | Performance |
+      |  Multiplier  |       |   Divider    |       |     FPU      |       |Manipulation| |  Counters   |
+      +--------------+       +--------------+       +--------------+       +------------+ +-------------+
+```
 
 ---
 
-## Directory & Feature Structure
+## Complete 9-Feature Architecture Roadmap
 
-| Folder | Feature / Module | Status | Deliverables |
-|---|---|---|---|
-| [`feature_1/`](feature_1/) | **5-Stage Pipeline Upgrade & Hazard Unit** | **Completed & Verified** | IF-WB pipeline registers, Hazard/Forwarding Unit, `tb_hazard.v`, `tb_pipeline_base.v` |
-| [`feature_2/`](feature_2/) | Hardware Multiplier (Booth / RV32M) | Planned (Milestone 2) | Booth multiplier RTL, `tb_math.v` |
-| [`feature_3/`](feature_3/) | Multi-Cycle Hardware Divider | Planned (Milestone 2) | Radix-2 divider RTL, stall controller |
-| [`feature_4/`](feature_4/) | L1 Instruction Cache (I-Cache) | Planned (Milestone 2) | Direct-mapped I-cache RTL, `tb_icache.v` |
-| [`feature_5/`](feature_5/) | L1 Data Cache (D-Cache) | Planned (Milestone 3) | Direct-mapped D-cache RTL |
-| [`feature_6/`](feature_6/) | 64-bit Neural Network MAC Coprocessor | Planned (Milestone 3) | MAC RTL, custom opcode decoder |
-| [`feature_7/`](feature_7/) | Branch Prediction (BTB) & Integration | Planned (Milestone 4) | 32-entry BTB RTL, FPGA top demo |
+| Feature | Directory | Module / Extension | Integration Stage | Description & Deliverables |
+|---|---|---|---|---|
+| **Feature 1** | [`feature_1/`](feature_1/) | **5-Stage Pipeline Upgrade** | All Stages (IF–WB) | 5-stage core, Hazard Detection & Forwarding Unit, C test suite, cycle-by-cycle timing analyses |
+| **Feature 2** | [`feature_2/`](feature_2/) | **Hardware Multiplier** | Execute (EX) | Radix-4 Booth / DSP multiplier supporting `MUL`, `MULH`, `MULHSU`, `MULHU` |
+| **Feature 3** | [`feature_3/`](feature_3/) | **Hardware Divider** | Execute (EX) | Multi-cycle Radix-2 non-restoring divider (`DIV`, `DIVU`, `REM`, `REMU`) with stall controller |
+| **Feature 4** | [`feature_4/`](feature_4/) | **IEEE754 FPU** | Execute (EX) & RegFile | Single-precision (32-bit) Floating Point Unit (`FADD`, `FSUB`, `FMUL`, `FDIV`, `FCVT`, `FLW`, `FSW`) |
+| **Feature 5** | [`feature_5/`](feature_5/) | **L1 Instruction Cache** | Fetch (IF) | Direct-mapped / 2-way set-associative I-Cache with hit/miss controller and burst refill |
+| **Feature 6** | [`feature_6/`](feature_6/) | **Branch Prediction** | Fetch & Execute | 32-entry Branch Target Buffer (BTB) + 2-bit saturating counter BHT to reduce branch penalty |
+| **Feature 7** | [`feature_7/`](feature_7/) | **L1 Data Cache** | Memory (MEM) | D-Cache with write-through/write-back policy and byte-enable alignment |
+| **Feature 8** | [`feature_8/`](feature_8/) | **Performance Counters** | System / CSRs | Hardware performance monitor for cycles, retired instructions, branch mispredicts, and cache misses |
+| **Feature 9** | [`feature_9/`](feature_9/) | **Bit Manipulation** | Execute (EX) ALU | RV32B extension (Zba, Zbb, Zbs: `CLZ`, `CTZ`, `CPOP`, `ROL`, `ROR`, `ANDN`, `XNOR`, etc.) |
 
 ---
 
-## Getting Started & Simulation
+## Verification & Simulation Flow
 
-Simulations are configured for **Vivado Simulator (`xvlog`, `xelab`, `xsim`)**:
+Testbenches and automation scripts are configured for **Vivado Simulator (`xvlog`, `xelab`, `xsim`)**:
 
-```powershell
-# Navigate to Feature 1 simulation directory
+```bash
+# 1. Automated multi-test runner from root
+python run_c_tests.py all
+
+# 2. Run individual C tests on the 5-stage core
+python run_c_tests.py addition
+python run_c_tests.py fibonacci
+python run_c_tests.py sort
+
+# 3. Vivado simulation via Makefile
 cd feature_1/simulation
-
-# Run unit hazard testbench
-make sim_hazard
-
-# Run full-system program testbench
-make sim_pipeline
-
-# Run all testbenches
 make all
 ```
