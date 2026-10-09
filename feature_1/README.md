@@ -1,6 +1,6 @@
 # Feature 1: 5-Stage Pipeline Upgrade & Hazard Detection Unit
 
-**Project:** Pipelined RV32IM RISC-V Core with L1 Cache Hierarchy and Dedicated Neural Network MAC Coprocessor  
+**Project:** Pipelined RV32IMF RISC-V Core with L1 Cache Hierarchy, Branch Prediction, and Hardware Math Accelerators  
 **Course:** CS2202L (Group 13)  
 **Deliverable Milestone (Week 5–11 Oct):** Base 5-Stage Pipeline Integration & Hazard Unit  
 **Deliverables:** IF-WB pipeline registers, Forwarding multiplexer RTL + `tb_pipeline_base.v` and `tb_hazard.v`
