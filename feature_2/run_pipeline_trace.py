@@ -164,6 +164,8 @@ def main():
     parser = argparse.ArgumentParser(description="Feature 2: RV32M Multiplier Visualizer & FPGA Mapping")
     parser.add_argument("target", nargs="?", default="multiplication",
                         help="Target test (multiplication, addition, fibonacci, sort, negative, xor, etc.)")
+    parser.add_argument("--bitstream", action="store_true",
+                        help="Automatically regenerate FPGA bitstream in Vivado after compiling hex")
     args = parser.parse_args()
     target = args.target
 
@@ -186,6 +188,14 @@ def main():
     print("=" * 115)
     print_imem_listing(imem_map)
     print_fpga_instructions()
+
+    if args.bitstream:
+        print("\n[*] Regenerating FPGA bitstream via Vivado (takes ~1-2 mins)...")
+        b_tcl = os.path.join(CURRENT_DIR, "build_bitstream.tcl")
+        subprocess.check_call(f"vivado -mode batch -source {b_tcl}", shell=True, cwd=ROOT_DIR)
+        print("\n[+] FPGA bitstream successfully generated:")
+        print(f"    -> {os.path.join(CURRENT_DIR, 'vivado_project', 'rv32m_multiplier_fpga.runs', 'impl_1', 'fpga_top_feature2.bit')}")
+        print("    Program your Nexys A7 FPGA in Vivado Hardware Manager with this bitfile to view live execution!")
 
 if __name__ == "__main__":
     main()

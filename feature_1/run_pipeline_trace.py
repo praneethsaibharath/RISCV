@@ -415,6 +415,8 @@ def main():
                         help="Target test (addition, fibonacci, sort, negative, xor, or custom file .c / .s / .hex)")
     parser.add_argument("--asm", type=str, default=None,
                         help="Direct assembly string (e.g. 'addi x1, x0, 10; addi x2, x0, 2; add x3, x1, x2; ret')")
+    parser.add_argument("--bitstream", action="store_true",
+                        help="Automatically regenerate FPGA bitstream in Vivado after compiling hex")
 
     args = parser.parse_args()
     target = args.target
@@ -461,6 +463,15 @@ def main():
 
     # 6. Print FPGA & Performance Summary
     print_fpga_mapping_summary(records, ret_val, imem_map)
+
+    # 7. Optional FPGA Bitstream Re-generation
+    if args.bitstream:
+        print("\n[*] Regenerating FPGA bitstream via Vivado (takes ~1-2 mins)...")
+        b_tcl = os.path.join(FEATURE1_DIR, "build_bitstream.tcl")
+        subprocess.check_call(f"vivado -mode batch -source {b_tcl}", shell=True, cwd=ROOT_DIR)
+        print("\n[+] FPGA bitstream successfully generated:")
+        print(f"    -> {os.path.join(FEATURE1_DIR, 'vivado_project', 'rv32i_5stage_core.runs', 'impl_1', 'fpga_top_feature1.bit')}")
+        print("    Program your Nexys A7 FPGA in Vivado Hardware Manager with this bitfile to view live execution!")
 
 if __name__ == "__main__":
     main()
