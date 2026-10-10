@@ -27,7 +27,7 @@ module fpga_top_feature1 (
     input  wire        clk_100mhz,  // 100 MHz primary oscillator (Pin E3)
     input  wire        cpu_resetn,  // Active-low CPU reset pushbutton (Pin C12)
     input  wire        btnc,        // Center pushbutton for single-stepping (Pin N17)
-    input  wire [1:0]  sw,          // Slide switches: sw[0]=Step mode, sw[1]=Speed select
+    input  wire [2:0]  sw,          // Slide switches: sw[0]=Step mode, sw[1]=1Hz slow clk, sw[2]=Display select (0=PC, 1=Instruction)
     output wire [7:0]  an,          // 8-digit Seven-Segment Anodes (Pins J17..U13)
     output wire [6:0]  seg,         // 7-segment Cathodes (Pins T10..L18)
     output wire        dp,          // Decimal point (Pin H15)
@@ -184,12 +184,15 @@ module fpga_top_feature1 (
 
     // ------------------------------------------------------------------------
     // 8-Digit 7-Segment Display Controller
-    // Shows the current Fetch Address (pc_if[31:0] / imem_addr)
+    // sw[2] = 0: Shows current Fetch Address (pc_if[31:0] / imem_addr, e.g. 00000028)
+    // sw[2] = 1: Shows 32-bit Machine Instruction (imem_rdata, e.g. 00F707B3 for ADD)
     // ------------------------------------------------------------------------
+    wire [31:0] display_data = (sw[2]) ? imem_rdata : imem_addr;
+
     seven_seg_controller u_seven_seg (
         .clk     (clk_100mhz),
         .reset_n (sys_reset_n),
-        .data_in (imem_addr), // Address being fetched on the 8 digits above the LEDs!
+        .data_in (display_data), // Address (sw[2]=0) or Instruction Machine Code (sw[2]=1)
         .an      (an),
         .seg     (seg),
         .dp      (dp)

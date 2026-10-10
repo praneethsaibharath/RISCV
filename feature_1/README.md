@@ -192,6 +192,7 @@ The 5-stage core has a dedicated FPGA top-level wrapper (`modules/fpga_top_featu
 | **LED[15:8]** | Discrete LEDs 15:8 | `wb_data[7:0]` | Displays low byte of retired register result (e.g. `102` = `0x66`). |
 | **Switch sw[0]** | Slide Switch 0 (Pin `J15`) | Clock Mode | `0` = Continuous Execution, `1` = Manual Single-Step Clock Mode via `btnc`. |
 | **Switch sw[1]** | Slide Switch 1 (Pin `L16`) | Speed Select | `0` = 100 MHz full speed, `1` = 1 Hz slow clock for live visual tracking (1 instruction/cycle per second). |
+| **Switch sw[2]** | Slide Switch 2 (Pin `M13`) | Display Select | `0` = 7-Segment shows **Fetch PC Address** (e.g. `00000028`), `1` = Shows **32-bit Machine Instruction Code** (e.g. `00F707B3` for `add`). |
 | **Button btnc** | Center Pushbutton (Pin `N17`)| Step Clock | In step mode (`sw[0]=1`), advances pipeline by exactly 1 clock cycle per press. |
 | **Button reset**| CPU Reset (Pin `C12`) | `cpu_resetn` | Active-low master synchronous reset. |
 

@@ -6,7 +6,7 @@
 *.vcd
 xsim.dir/
 .Xil/
-dfx_runtime.txt
+*dfx_runtime.txt
 
 
 # OS and Office specific files
@@ -30,4 +30,6 @@ feature_1/vivado_project/*.hw/
 feature_1/vivado_project/*.ip_user_files/
 feature_1/vivado_project/*.runs/
 feature_1/vivado_project/*.sim/
+feature_1/vivado_project/*.srcs/
+*.dcp
 

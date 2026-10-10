@@ -24,9 +24,11 @@ set_property -dict { PACKAGE_PIN N17   IOSTANDARD LVCMOS33 } [get_ports { btnc }
 ## Slide Switches
 ## sw[0]: Mode select (0 = Normal Run, 1 = Manual Single-Step via btnc)
 ## sw[1]: Speed select (0 = 100 MHz full speed, 1 = 1 Hz slow visual clock)
+## sw[2]: Display select (0 = PC Address, 1 = 32-bit Instruction Machine Code)
 ## ----------------------------------------------------------------------------
 set_property -dict { PACKAGE_PIN J15   IOSTANDARD LVCMOS33 } [get_ports { sw[0] }];
 set_property -dict { PACKAGE_PIN L16   IOSTANDARD LVCMOS33 } [get_ports { sw[1] }];
+set_property -dict { PACKAGE_PIN M13   IOSTANDARD LVCMOS33 } [get_ports { sw[2] }];
 
 ## ----------------------------------------------------------------------------
 ## 8-Digit Seven-Segment Display (Directly ABOVE the 16 LEDs)
