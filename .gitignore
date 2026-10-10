@@ -6,6 +6,8 @@
 *.vcd
 xsim.dir/
 .Xil/
+dfx_runtime.txt
+
 
 # OS and Office specific files
 Thumbs.db
@@ -17,3 +19,9 @@ Desktop.ini
 *.bin
 _tmp_*
 
+# Vivado project caches & runs
+vivado_project/*.cache/
+vivado_project/*.hw/
+vivado_project/*.ip_user_files/
+vivado_project/*.runs/
+vivado_project/*.sim/
