@@ -164,6 +164,8 @@ module tb_pipeline_base;
 
             // Trace PC progression
             $display("next_pc = %08x", pc_if);
+            $display("[TRACE] CC=%0d | IF_PC=%08h | IF_INST=%08h | ID_PC=%08h | EX_PC=%08h | MEM_PC=%08h | WB_PC=%08h | FWD_A=%0d | FWD_B=%0d | STALL=%0d | FLUSH=%0d | WB_WE=%0d | WB_RD=%0d | WB_DATA=%08h",
+                     cycle_count, pc_if, imem_rdata, pc_id, pc_ex, pc_mem, pc_wb, forward_a, forward_b, hazard_stall, hazard_flush_id, wb_reg_write, wb_dest_reg, wb_data);
 
             // Program Termination condition
             // Detect return instruction (ret = 32'h00008067: jalr x0, ra, 0)

@@ -171,3 +171,68 @@ make all
 # Clean Simulation Artifacts
 make clean
 ```
+
+---
+
+## 7. FPGA Implementation & Board Mapping (Digilent Nexys A7-100T)
+
+The 5-stage core has a dedicated FPGA top-level wrapper (`modules/fpga_top_feature1.v`) and XDC constraints file (`constraints/nexys_a7_100t.xdc`) targeted to the Xilinx Artix-7 XC7A100T FPGA.
+
+### Board Peripherals & Visual Feedback
+
+| Peripheral | Board Location | Core Signal Connected | Hardware Behavior & Visual Indication |
+|---|---|---|---|
+| **8-Digit 7-Segment Display** | Located directly **ABOVE the 16 LEDs** | `imem_addr` / `pc_if[31:0]` | **Displays the 32-bit Address Being Fetched** in real-time (8 hex characters, e.g. `00000028`), multiplexed across all 8 digits at ~763 Hz without flicker. |
+| **LED[0]** | Discrete LED 0 (Pin `H17`) | `hazard_stall` | **DATA HAZARD LED:** Turns ON whenever a data hazard is detected (load-use stall freeze). Features ~50ms pulse-stretching for clear naked-eye visibility at 100 MHz. |
+| **LED[1]** | Discrete LED 1 (Pin `K15`) | `(forward_a != 0) \|\| (forward_b != 0)` | **DATA FORWARDING LED:** Turns ON whenever data forwarding is active (operand bypass from EX/MEM or MEM/WB). Pulse-stretched. |
+| **LED[2]** | Discrete LED 2 (Pin `J13`) | `hazard_flush_id` | **BRANCH FLUSH LED:** Turns ON when a branch misprediction or jump flush annuls instructions. |
+| **LED[3]** | Discrete LED 3 (Pin `N14`) | `wb_reg_write` | **RETIREMENT LED:** Turns ON whenever an instruction commits to the Register File. |
+| **LED[5:4]** | Discrete LEDs 5:4 | `forward_a[1:0]` | Raw Forwarding code for Operand A (`01`: EX/MEM, `10`: MEM/WB). |
+| **LED[7:6]** | Discrete LEDs 7:6 | `forward_b[1:0]` | Raw Forwarding code for Operand B (`01`: EX/MEM, `10`: MEM/WB). |
+| **LED[15:8]** | Discrete LEDs 15:8 | `wb_data[7:0]` | Displays low byte of retired register result (e.g. `102` = `0x66`). |
+| **Switch sw[0]** | Slide Switch 0 (Pin `J15`) | Clock Mode | `0` = Continuous Execution, `1` = Manual Single-Step Clock Mode via `btnc`. |
+| **Switch sw[1]** | Slide Switch 1 (Pin `L16`) | Speed Select | `0` = 100 MHz full speed, `1` = ~3 Hz slow clock for live visual tracking. |
+| **Button btnc** | Center Pushbutton (Pin `N17`)| Step Clock | In step mode (`sw[0]=1`), advances pipeline by exactly 1 clock cycle per press. |
+| **Button reset**| CPU Reset (Pin `C12`) | `cpu_resetn` | Active-low master synchronous reset. |
+
+---
+
+## 8. Interactive Terminal Pipeline Simulation & Trace Visualizer
+
+A full-system cycle-by-cycle pipeline trace tool is available via `run_pipeline_trace.py`:
+
+```bash
+# Run standard compiled C benchmarks with cycle-by-cycle trace:
+python run_pipeline_trace.py addition
+python run_pipeline_trace.py fibonacci
+python run_pipeline_trace.py sort
+python run_pipeline_trace.py negative
+python run_pipeline_trace.py xor
+
+# Run custom inline assembly instructions:
+python run_pipeline_trace.py --asm "addi x1, x0, 15; addi x2, x0, 25; add x3, x1, x2; addi x10, x3, 0; ret"
+
+# Run custom C, Assembly, or Hex file:
+python run_pipeline_trace.py custom_prog.c
+python run_pipeline_trace.py custom_prog.s
+python run_pipeline_trace.py custom_prog.hex
+```
+
+### What `run_pipeline_trace.py` Displays on the Terminal Screen:
+
+1. **Static Instruction Memory Listing**: Address, 32-bit machine word, and decoded instruction mnemonic for every instruction in memory.
+2. **Cycle-by-Cycle Pipeline Trace Table**: Shows the exact instruction present in each stage at each clock cycle:
+   - `CC`: Clock cycle number
+   - `FETCH (IF)`: PC address and instruction being fetched (displayed on the 8 seven-segment lights).
+   - `DECODE (ID)`: PC address and instruction being decoded.
+   - `EXECUTE (EX)`: PC address and instruction executing in the ALU.
+   - `MEMORY (MEM)`: PC address and memory access operation.
+   - `WRITEBACK (WB)`: PC address and register retirement value (`rd <= value`).
+   - `HAZARDS & FORWARDING NOTES`: Live annotations showing:
+     - `>>> [DATA HAZARD STALL] (LED[0] ON! Freeze IF/ID, bubble to EX)`
+     - `[*] [DATA FORWARDING] (LED[1] ON! A:EX/MEM, B:MEM/WB)`
+     - `[!] [BRANCH/CONTROL FLUSH] (LED[2] ON! Annulling IF/ID)`
+     - `[+] [RETIRE] rd = val (LED[3] ON)`
+3. **Dynamic Instruction Execution Order**: Chronological list of retired instructions in the exact order they executed.
+4. **FPGA Hardware Verification Summary**: Total cycles, retired instructions, IPC throughput, hazard stall counts, forwarding event counts, and final return value in `a0` (`x10`).
+

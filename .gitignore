@@ -14,3 +14,6 @@ Desktop.ini
 ~$*
 # Compiler intermediate binaries
 *.elf
+*.bin
+_tmp_*
+
