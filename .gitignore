@@ -25,3 +25,9 @@ vivado_project/*.hw/
 vivado_project/*.ip_user_files/
 vivado_project/*.runs/
 vivado_project/*.sim/
+feature_1/vivado_project/*.cache/
+feature_1/vivado_project/*.hw/
+feature_1/vivado_project/*.ip_user_files/
+feature_1/vivado_project/*.runs/
+feature_1/vivado_project/*.sim/
+

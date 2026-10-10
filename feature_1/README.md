@@ -236,3 +236,19 @@ python run_pipeline_trace.py custom_prog.hex
 3. **Dynamic Instruction Execution Order**: Chronological list of retired instructions in the exact order they executed.
 4. **FPGA Hardware Verification Summary**: Total cycles, retired instructions, IPC throughput, hazard stall counts, forwarding event counts, and final return value in `a0` (`x10`).
 
+---
+
+## 9. Opening in AMD Vivado GUI
+
+The project files and scripts are housed directly within `feature_1`:
+
+1. **One-Click Launch:**
+   - Double-click or run `open_vivado.bat` inside `feature_1/` (or run `open_vivado.bat` at the repository root, which forwards here).
+2. **Batch Generation:**
+   - If regenerating from scratch:
+     ```bash
+     cd feature_1
+     vivado -mode batch -source create_vivado_project.tcl
+     ```
+3. **Direct Project File:**
+   - Double-click `feature_1/vivado_project/rv32i_5stage_core.xpr`.
