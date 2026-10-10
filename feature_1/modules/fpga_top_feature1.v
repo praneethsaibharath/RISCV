@@ -73,16 +73,21 @@ module fpga_top_feature1 (
     assign btn_pulse = btn_state && !btn_prev;
 
     // ------------------------------------------------------------------------
-    // Clock Generation: 100 MHz, Slow Clock (~4 Hz), or Manual Step
+    // Clock Generation: 100 MHz, Slow Clock (1 Hz), or Manual Step
     // ------------------------------------------------------------------------
-    reg [24:0] clk_div_cnt;
+    reg [25:0] clk_div_cnt;
+    reg        slow_clk;
     always @(posedge clk_100mhz or negedge sys_reset_n) begin
-        if (!sys_reset_n)
-            clk_div_cnt <= 25'd0;
-        else
-            clk_div_cnt <= clk_div_cnt + 25'd1;
+        if (!sys_reset_n) begin
+            clk_div_cnt <= 26'd0;
+            slow_clk    <= 1'b0;
+        end else if (clk_div_cnt == 26'd49_999_999) begin
+            clk_div_cnt <= 26'd0;
+            slow_clk    <= ~slow_clk;
+        end else begin
+            clk_div_cnt <= clk_div_cnt + 26'd1;
+        end
     end
-    wire slow_clk = clk_div_cnt[24]; // ~3 Hz for visual verification
 
     // Core Clock Selection
     wire core_clk;
@@ -227,10 +232,10 @@ module fpga_top_feature1 (
         end
     end
 
-    // Direct or Stretched LED driving
-    wire led_hazard = (sw[0]) ? hazard_stall : (hazard_stretch_cnt > 0);
-    wire led_fwd    = (sw[0]) ? fwd_active   : (fwd_stretch_cnt > 0);
-    wire led_flush  = (sw[0]) ? hazard_flush_id : (flush_stretch_cnt > 0);
+    // Direct or Stretched LED driving (Direct in step mode sw[0] or 1Hz slow mode sw[1]; stretched at 100MHz)
+    wire led_hazard = (sw[0] || sw[1]) ? hazard_stall : (hazard_stretch_cnt > 0);
+    wire led_fwd    = (sw[0] || sw[1]) ? fwd_active   : (fwd_stretch_cnt > 0);
+    wire led_flush  = (sw[0] || sw[1]) ? hazard_flush_id : (flush_stretch_cnt > 0);
 
     // LED Port Assignments
     assign led[0]    = led_hazard;            // LED[0]: Data Hazard Detected!
