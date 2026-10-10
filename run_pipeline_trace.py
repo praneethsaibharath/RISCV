@@ -252,28 +252,37 @@ def run_simulation(target_name, imem_map):
     return trace_records, ret_val, out
 
 def print_banner(target_name):
-    print("=" * 135)
-    print(f"       RV32I 5-STAGE PIPELINE CYCLE-BY-CYCLE SIMULATION & TRACE VISUALIZER ({target_name.upper()})")
-    print("       Features: Hazard Detection, Data Forwarding, Branch Flushes, FPGA 8-Digit Display Mapping")
-    print("=" * 135)
+    print("=" * 148)
+    print(f"       RV32I/RV32M 5-STAGE PIPELINE CYCLE-BY-CYCLE SIMULATION & FPGA TRACE VISUALIZER ({target_name.upper()})")
+    print("       Features: Hazard Detection, Data Forwarding, Branch Flushes, RV32M DSP Multiplier, FPGA Nexys A7 Display")
+    print("=" * 148)
 
 def print_imem_listing(imem_map):
-    print("\n[1] STATIC INSTRUCTION MEMORY LISTING (HEX & MNEMONICS):")
-    print("-" * 80)
-    print(f" {'Address':<12} | {'Machine Word':<14} | {'Disassembled Instruction Mnemonic':<45}")
-    print("-" * 80)
+    print("\n[1] STATIC INSTRUCTION MEMORY LISTING & FPGA 7-SEGMENT DISPLAY MAPPING:")
+    print("=" * 115)
+    print(f" {'Address (7-Seg sw[2]=0)':<25} | {'Hex Code (7-Seg sw[2]=1)':<25} | {'Disassembled Mnemonic':<30} | {'FPGA Hardware Note':<25}")
+    print("=" * 115)
     for addr in sorted(imem_map.keys()):
         word, mnem = imem_map[addr]
-        if word != 0 or addr < 0x40:
-            print(f" 0x{addr:08x}   | 0x{word:08x}     | {mnem:<45}")
-    print("-" * 80)
+        if word != 0 or addr < 0x48:
+            note = ""
+            if "mul" in mnem:
+                note = "<-- RV32M MULTIPLIER (DSP48E1)"
+            elif "lw" in mnem or "sw" in mnem:
+                note = "Memory Access (DMEM)"
+            elif "ret" in mnem or "jalr" in mnem or "beq" in mnem or "bne" in mnem:
+                note = "Control Flow (Branch/Jump)"
+            elif "addi" in mnem or "add" in mnem or "sub" in mnem:
+                note = "Arithmetic / Immediate"
+            print(f" 0x{addr:08x}                | 0x{word:08x}                | {mnem:<30} | {note:<25}")
+    print("=" * 115)
 
 def print_trace_table(records, imem_map):
-    print("\n[2] CYCLE-BY-CYCLE PIPELINE EXECUTION TRACE TABLE:")
-    print("=" * 135)
-    header = f"{'CC':<4} | {'FETCH (IF)':<24} | {'DECODE (ID)':<24} | {'EXECUTE (EX)':<24} | {'MEMORY (MEM)':<18} | {'WRITEBACK (WB)':<18} | {'HAZARDS / FORWARDING / NOTES'}"
+    print("\n[2] CYCLE-BY-CYCLE PIPELINE EXECUTION TRACE TABLE & FPGA HARDWARE STATE:")
+    print("=" * 148)
+    header = f"{'CC':<4} | {'FETCH (IF)':<24} | {'DECODE (ID)':<24} | {'EXECUTE (EX)':<24} | {'MEM':<10} | {'WB':<18} | {'7-SEG DISPLAY':<20} | {'FPGA LEDS & PIPELINE NOTES'}"
     print(header)
-    print("=" * 135)
+    print("=" * 148)
 
     retired_instructions = []
 
@@ -313,38 +322,44 @@ def print_trace_table(records, imem_map):
         else:
             wb_str = "-"
 
-        # Notes / Hazards / Forwarding
+        # 7-Segment Display representation: sw[2]=0 shows PC, sw[2]=1 shows Instruction Code
+        seg_str = f"PC:{if_pc:04x} / CD:{if_inst:08x}"
+
+        # Notes / Hazards / Forwarding / LED indicators
         notes = []
         if r["stall"]:
-            notes.append(">>> [DATA HAZARD STALL] (LED[0] ON! Freeze IF/ID, bubble to EX)")
+            notes.append(">>> [HAZARD STALL] LED[0]=ON (Freeze IF/ID, bubble to EX)")
         if r["fwd_a"] != 0 or r["fwd_b"] != 0:
             fwd_a_desc = "EX/MEM" if r["fwd_a"] == 1 else ("MEM/WB" if r["fwd_a"] == 2 else "")
             fwd_b_desc = "EX/MEM" if r["fwd_b"] == 1 else ("MEM/WB" if r["fwd_b"] == 2 else "")
             fwd_info = []
             if fwd_a_desc: fwd_info.append(f"A:{fwd_a_desc}")
             if fwd_b_desc: fwd_info.append(f"B:{fwd_b_desc}")
-            notes.append(f"[*] [DATA FORWARDING] (LED[1] ON! {', '.join(fwd_info)})")
+            notes.append(f"[*] [FORWARDING] LED[1]=ON ({', '.join(fwd_info)})")
         if r["flush"]:
-            notes.append("[!] [BRANCH/CONTROL FLUSH] (LED[2] ON! Annulling IF/ID)")
+            notes.append("[!] [BRANCH FLUSH] LED[2]=ON (Annulling IF/ID)")
         if wb_we and wb_rd != 0:
-            notes.append(f"[+] [RETIRE] {REG_NAMES[wb_rd]} = {wb_data} (LED[3] ON)")
+            led_byte = wb_data & 0xFF
+            notes.append(f"[+] [RETIRE] {REG_NAMES[wb_rd]}={wb_data} LED[3]=ON LED[15:8]=0x{led_byte:02x}")
 
         notes_str = "; ".join(notes) if notes else "Normal Execution"
 
-        print(f"{cc:<4} | {if_str:<24} | {id_str:<24} | {ex_str:<24} | {mem_str:<18} | {wb_str:<18} | {notes_str}")
+        print(f"{cc:<4} | {if_str:<24} | {id_str:<24} | {ex_str:<24} | {mem_str:<10} | {wb_str:<18} | {seg_str:<20} | {notes_str}")
 
-    print("=" * 135)
+    print("=" * 148)
     return retired_instructions
 
 def print_execution_order(retired_instructions):
-    print("\n[3] DYNAMIC INSTRUCTION EXECUTION ORDER (COMMITTED / RETIRED):")
-    print("-" * 95)
-    print(f" {'#':<4} | {'Cycle':<6} | {'PC':<12} | {'Instruction Mnemonic':<32} | {'Register Commit Result':<30}")
-    print("-" * 95)
+    print("\n[3] DYNAMIC INSTRUCTION EXECUTION ORDER (COMMITTED / RETIRED TO REGISTER FILE):")
+    print("-" * 115)
+    print(f" {'#':<4} | {'Cycle':<6} | {'PC':<12} | {'Instruction Mnemonic':<28} | {'Register Commit Result':<26} | {'FPGA LED[15:8] Output':<25}")
+    print("-" * 115)
     for idx, (cc, pc, mnem, rd, val) in enumerate(retired_instructions, 1):
         signed_val = val if val < 0x80000000 else val - 0x100000000
-        print(f" {idx:<4} | CC={cc:<3} | 0x{pc:08x}   | {mnem:<32} | {rd} <= {signed_val} (0x{val:08x})")
-    print("-" * 95)
+        led_byte = val & 0xFF
+        led_bin = f"{led_byte:08b}"
+        print(f" {idx:<4} | CC={cc:<3} | 0x{pc:08x}   | {mnem:<28} | {rd} <= {signed_val:<5} (0x{val:08x})  | 0x{led_byte:02x} ({led_bin})")
+    print("-" * 115)
 
 def print_fpga_mapping_summary(records, ret_val):
     total_cycles = len(records)
@@ -355,18 +370,39 @@ def print_fpga_mapping_summary(records, ret_val):
     ipc = retired / total_cycles if total_cycles > 0 else 0
 
     print("\n[4] FPGA HARDWARE & VERIFICATION SUMMARY:")
-    print("=" * 80)
-    print(f" * 8-Digit Seven-Segment Display : Shows Fetch Address (pc_if) in real-time")
-    print(f" * LED[0] (DATA HAZARD STALL)    : Triggered {stalls} times (Load-Use interlocks)")
-    print(f" * LED[1] (DATA FORWARDING)      : Triggered {forwards} times (Distance-1 & 2 bypasses)")
-    print(f" * LED[2] (BRANCH FLUSH)         : Triggered {flushes} times (Control hazard flushes)")
-    print(f" * LED[3] (WRITEBACK RETIREMENT) : Triggered {retired} times (Instructions retired)")
+    print("=" * 95)
     print(f" * Total Elapsed Clock Cycles    : {total_cycles}")
     print(f" * Instructions Retired          : {retired}")
     print(f" * Throughput (IPC)              : {ipc:.2f} instructions / cycle")
     if ret_val is not None:
         print(f" * FINAL RETURN VALUE a0 (x10)   : {ret_val} (0x{ret_val & 0xFFFFFFFF:08x})")
-    print("=" * 80 + "\n")
+    print("=" * 95)
+
+    print("\n[5] HOW TO VIEW THESE INSTRUCTIONS ON THE PHYSICAL NEXYS A7 FPGA BOARD:")
+    print("-" * 95)
+    print(" 1. SPEED & CLOCK CONTROL (Slide Switches & Buttons):")
+    print("    - sw[1] = 1 (Pin L16 ON) : 1 Hz Slow Clock mode. Processor runs 1 cycle/second.")
+    print("                               Watch each instruction and LED transition live at human speed!")
+    print("    - sw[0] = 1 (Pin J15 ON) : Manual Single-Step mode.")
+    print("                               Press Center Pushbutton (btnc, Pin N17) to advance exactly 1 cycle.")
+    print("    - cpu_resetn (Pin C12)   : Press red CPU Reset button to restart program execution from PC=0x00.")
+    print("")
+    print(" 2. 8-DIGIT SEVEN-SEGMENT DISPLAY (Directly above the switches/LEDs):")
+    print("    - sw[2] = 0 (Pin M13 OFF): Shows Program Counter Fetch Address (pc_if[31:0]).")
+    print("                               E.g., Cycle 10 shows '00000028' (PC of 'mul a5, a4, a5').")
+    print("    - sw[2] = 1 (Pin M13 ON) : Shows 32-bit Machine Instruction Code (imem_rdata[31:0]).")
+    print("                               E.g., Cycle 10 shows '02F707B3' (Machine code of 'mul a5, a4, a5').")
+    print("")
+    print(" 3. LED HARDWARE INDICATORS:")
+    print("    - LED[0] (Pin H17)       : DATA HAZARD STALL (Turns ON during load-use hazard interlocks).")
+    print("    - LED[1] (Pin K15)       : DATA FORWARDING ACTIVE (Turns ON when ALU/Multiplier forwards data).")
+    print("    - LED[2] (Pin J13)       : BRANCH / RETURN FLUSH (Turns ON when speculative pipeline flushes).")
+    print("    - LED[3] (Pin N14)       : WRITEBACK COMMIT (Turns ON whenever an instruction retires to a register).")
+    print(f"    - LED[15:8] (Pins V11..H6): Low 8 bits of committed register result (wb_data[7:0]).")
+    if ret_val is not None:
+        final_byte = ret_val & 0xFF
+        print(f"                               Final Result {ret_val} (0x{ret_val:08x}) -> LED[15:8] = 0x{final_byte:02x} ({final_byte:08b}b).")
+    print("-" * 95 + "\n")
 
 def main():
     parser = argparse.ArgumentParser(description="5-Stage RV32I Processor Pipeline Trace Visualizer")

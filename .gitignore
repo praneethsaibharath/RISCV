@@ -10,6 +10,8 @@ xsim.dir/
 
 
 # OS and Office specific files
+__pycache__/
+*.pyc
 Thumbs.db
 Desktop.ini
 .DS_Store
