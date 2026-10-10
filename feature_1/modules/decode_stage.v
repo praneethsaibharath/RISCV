@@ -33,6 +33,7 @@ module decode_stage (
     output reg         mem_to_reg_o,
     output reg         reg_write_o,
     output reg         immediate_sel_o,
+    output reg         is_mul_o,
     output reg         illegal_inst_o,
 
     // Decoded Data Signals to ID/EX
@@ -107,6 +108,7 @@ module decode_stage (
         mem_to_reg_o    = 1'b0;
         reg_write_o     = 1'b0;
         immediate_sel_o = 1'b0;
+        is_mul_o        = 1'b0;
         illegal_inst_o  = 1'b0;
         imm_o           = 32'h0;
         id_rs1_used_o   = 1'b0;
@@ -114,10 +116,19 @@ module decode_stage (
 
         case (opcode)
             ARITHR: begin
-                alu_o         = 1'b1;
-                reg_write_o   = 1'b1;
-                id_rs1_used_o = 1'b1;
-                id_rs2_used_o = 1'b1;
+                if (instruction_i[31:25] == FUNCT7_M_EXT && instruction_i[14] == 1'b0) begin
+                    // RV32M Hardware Multiplication (MUL, MULH, MULHSU, MULHU)
+                    is_mul_o      = 1'b1;
+                    alu_o         = 1'b0;
+                    reg_write_o   = 1'b1;
+                    id_rs1_used_o = 1'b1;
+                    id_rs2_used_o = 1'b1;
+                end else begin
+                    alu_o         = 1'b1;
+                    reg_write_o   = 1'b1;
+                    id_rs1_used_o = 1'b1;
+                    id_rs2_used_o = 1'b1;
+                end
             end
 
             ARITHI: begin

@@ -26,6 +26,7 @@ module id_ex_reg (
     input  wire        mem_to_reg_i,
     input  wire        reg_write_i,
     input  wire        immediate_sel_i,
+    input  wire        is_mul_i,
     input  wire        illegal_inst_i,
 
     // Data Signals from ID
@@ -55,6 +56,7 @@ module id_ex_reg (
     output reg         mem_to_reg_o,
     output reg         reg_write_o,
     output reg         immediate_sel_o,
+    output reg         is_mul_o,
     output reg         illegal_inst_o,
 
     // Data Outputs to EX
@@ -86,6 +88,7 @@ module id_ex_reg (
             mem_to_reg_o    <= 1'b0;
             reg_write_o     <= 1'b0;
             immediate_sel_o <= 1'b0;
+            is_mul_o        <= 1'b0;
             illegal_inst_o  <= 1'b0;
 
             pc_o            <= 32'h0;
@@ -113,6 +116,7 @@ module id_ex_reg (
             mem_to_reg_o    <= 1'b0;
             reg_write_o     <= 1'b0;
             immediate_sel_o <= 1'b0;
+            is_mul_o        <= 1'b0;
             illegal_inst_o  <= 1'b0;
 
             pc_o            <= 32'h0;
@@ -139,6 +143,7 @@ module id_ex_reg (
             mem_to_reg_o    <= mem_to_reg_i;
             reg_write_o     <= reg_write_i;
             immediate_sel_o <= immediate_sel_i;
+            is_mul_o        <= is_mul_i;
             illegal_inst_o  <= illegal_inst_i;
 
             pc_o            <= pc_i;

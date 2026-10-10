@@ -128,6 +128,7 @@ module pipeline_5stage
     wire        id_mem_to_reg;
     wire        id_reg_write;
     wire        id_immediate_sel;
+    wire        id_is_mul;
     wire        id_illegal_inst;
     wire [31:0] id_rdata1;
     wire [31:0] id_rdata2;
@@ -160,6 +161,7 @@ module pipeline_5stage
         .mem_to_reg_o    (id_mem_to_reg),
         .reg_write_o     (id_reg_write),
         .immediate_sel_o (id_immediate_sel),
+        .is_mul_o        (id_is_mul),
         .illegal_inst_o  (id_illegal_inst),
         .rdata1_o        (id_rdata1),
         .rdata2_o        (id_rdata2),
@@ -188,6 +190,7 @@ module pipeline_5stage
     wire        id_ex_mem_to_reg;
     wire        id_ex_reg_write;
     wire        id_ex_immediate_sel;
+    wire        id_ex_is_mul;
     wire        id_ex_illegal_inst;
     wire [31:0] id_ex_pc;
     wire [31:0] id_ex_pc_plus4;
@@ -217,6 +220,7 @@ module pipeline_5stage
         .mem_to_reg_i    (id_mem_to_reg),
         .reg_write_i     (id_reg_write),
         .immediate_sel_i (id_immediate_sel),
+        .is_mul_i        (id_is_mul),
         .illegal_inst_i  (id_illegal_inst),
         .pc_i            (if_id_pc),
         .pc_plus4_i      (if_id_pc_plus4),
@@ -240,6 +244,7 @@ module pipeline_5stage
         .mem_to_reg_o    (id_ex_mem_to_reg),
         .reg_write_o     (id_ex_reg_write),
         .immediate_sel_o (id_ex_immediate_sel),
+        .is_mul_o        (id_ex_is_mul),
         .illegal_inst_o  (id_ex_illegal_inst),
         .pc_o            (id_ex_pc),
         .pc_plus4_o      (id_ex_pc_plus4),
@@ -282,6 +287,7 @@ module pipeline_5stage
         .mem_read_i            (id_ex_mem_read),
         .mem_write_i           (id_ex_mem_write),
         .immediate_sel_i       (id_ex_immediate_sel),
+        .is_mul_i              (id_ex_is_mul),
         .forward_a_i           (forward_a),
         .forward_b_i           (forward_b),
         .ex_mem_alu_result_i   (ex_mem_alu_result),

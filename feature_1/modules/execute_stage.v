@@ -26,6 +26,7 @@ module execute_stage (
     input  wire        mem_read_i,
     input  wire        mem_write_i,
     input  wire        immediate_sel_i,
+    input  wire        is_mul_i,
 
     // Forwarding Controls and Data
     input  wire [1:0]  forward_a_i,
@@ -95,10 +96,30 @@ module execute_stage (
     assign target_pc_o = jalr_i ? jalr_target : branch_target;
 
     // ------------------------------------------------------------------------
-    // 4. ALU Calculation
+    // 4. Hardware Multiplier (Feature 2) - Synthesized onto DSP48E1 slices
+    // ------------------------------------------------------------------------
+    wire [31:0] mul_result;
+
+    multiplier_unit #(
+        .USE_DSP(1) // Synthesizes onto Artix-7 DSP48E1 slices (<= 4 DSP budget)
+    ) u_multiplier (
+        .clk        (1'b0),
+        .reset_n    (1'b1),
+        .is_mul     (is_mul_i),
+        .funct3     (alu_op_i),
+        .op_a       (alu_in1),
+        .op_b       (forwarded_rdata2),
+        .mul_result (mul_result),
+        .mul_busy   ()
+    );
+
+    // ------------------------------------------------------------------------
+    // 5. Execution Result Multiplexer
     // ------------------------------------------------------------------------
     always @(*) begin
-        if (lui_i) begin
+        if (is_mul_i) begin
+            alu_result_o = mul_result;
+        end else if (lui_i) begin
             alu_result_o = imm_i;
         end else if (auipc_i) begin
             alu_result_o = pc_i + imm_i;

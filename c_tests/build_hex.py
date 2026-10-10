@@ -9,24 +9,27 @@ MEM_DIR = os.path.join(os.path.dirname(C_TESTS_DIR), "feature_1", "mem")
 CC      = "riscv-none-elf-gcc"
 OBJCOPY = "riscv-none-elf-objcopy"
 OBJDUMP = "riscv-none-elf-objdump"
-CFLAGS  = ["-march=rv32i", "-mabi=ilp32", "-O0"]
+CFLAGS  = ["-march=rv32im", "-mabi=ilp32", "-O0"]
 
 PROGRAMS = {
-    "addition":       "addition.c",
-    "code_addition":  "code_addition.c",
-    "addition.c":     "addition.c",
-    "fibonacci":      "fibonacci.c",
-    "code_fibonacci": "code_fibonacci.c",
-    "fibonacci.c":    "fibonacci.c",
-    "sort":           "sort.c",
-    "code_sort":      "code_sort.c",
-    "sort.c":         "sort.c",
-    "negative":       "negative.c",
-    "code_negative":  "code_negative.c",
-    "negative.c":     "negative.c",
-    "xor":            "xor.c",
-    "code_xor":       "code_xor.c",
-    "xor.c":          "xor.c"
+    "addition":            "addition.c",
+    "code_addition":       "code_addition.c",
+    "addition.c":          "addition.c",
+    "multiplication":      "multiplication.c",
+    "code_multiplication": "multiplication.c",
+    "multiplication.c":    "multiplication.c",
+    "fibonacci":           "fibonacci.c",
+    "code_fibonacci":      "code_fibonacci.c",
+    "fibonacci.c":         "fibonacci.c",
+    "sort":                "sort.c",
+    "code_sort":           "code_sort.c",
+    "sort.c":              "sort.c",
+    "negative":            "negative.c",
+    "code_negative":       "code_negative.c",
+    "negative.c":          "negative.c",
+    "xor":                 "xor.c",
+    "code_xor":            "code_xor.c",
+    "xor.c":               "xor.c"
 }
 
 def hex_change(val):

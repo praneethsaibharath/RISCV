@@ -90,7 +90,10 @@ def disassemble_word(word):
                 return f"li {r_d}, {imm_i}"
             return f"addi {r_d}, {r_1}, {imm_i}"
         return f"{names[funct3]} {r_d}, {r_1}, {imm_i}"
-    elif opcode == 0x33:  # OP
+    elif opcode == 0x33:  # OP / RV32M
+        if funct7 == 0x01:
+            m_names = ['mul', 'mulh', 'mulhsu', 'mulhu', 'div', 'divu', 'rem', 'remu']
+            return f"{m_names[funct3]} {r_d}, {r_1}, {r_2}"
         if funct3 == 0:
             return f"sub {r_d}, {r_1}, {r_2}" if funct7 == 0x20 else f"add {r_d}, {r_1}, {r_2}"
         names = ['add/sub', 'sll', 'slt', 'sltu', 'xor', 'srl/sra', 'or', 'and']
@@ -155,7 +158,7 @@ main:
         f.write(full_asm)
 
     # Compile with GCC
-    subprocess.check_call([CC, "-march=rv32i", "-mabi=ilp32", "-nostdlib", "-c", tmp_s, "-o", tmp_elf])
+    subprocess.check_call([CC, "-march=rv32im", "-mabi=ilp32", "-nostdlib", "-c", tmp_s, "-o", tmp_elf])
     subprocess.check_call([OBJCOPY, "-O", "binary", tmp_elf, tmp_bin])
 
     # Convert binary to hex
@@ -185,7 +188,7 @@ def compile_c_or_asm_file(file_path, out_imem, out_dmem):
     tmp_bin = os.path.join(C_TESTS_DIR, "_tmp_custom.bin")
 
     is_c = file_path.endswith(".c")
-    cflags = ["-march=rv32i", "-mabi=ilp32", "-O0"]
+    cflags = ["-march=rv32im", "-mabi=ilp32", "-O0"]
     if not is_c:
         cflags += ["-nostdlib"]
 
