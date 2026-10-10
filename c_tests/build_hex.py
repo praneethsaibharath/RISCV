@@ -4,7 +4,9 @@ import sys
 import shutil
 
 C_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
-MEM_DIR = os.path.join(os.path.dirname(C_TESTS_DIR), "feature_1", "mem")
+ROOT_DIR = os.path.dirname(C_TESTS_DIR)
+F1_MEM_DIR = os.path.join(ROOT_DIR, "feature_1", "mem")
+F2_MEM_DIR = os.path.join(ROOT_DIR, "feature_2", "mem")
 
 CC      = "riscv-none-elf-gcc"
 OBJCOPY = "riscv-none-elf-objcopy"
@@ -89,15 +91,16 @@ def build(prog_name):
     bin2hex(imem_bin, imem_hex)
     bin2hex(dmem_bin, dmem_hex)
     
-    # Copy to feature_1/mem
-    os.makedirs(MEM_DIR, exist_ok=True)
-    shutil.copy2(imem_hex, os.path.join(MEM_DIR, "imem.hex"))
-    shutil.copy2(dmem_hex, os.path.join(MEM_DIR, "dmem.hex"))
-    shutil.copy2(dis_file, os.path.join(MEM_DIR, "code.dis"))
-    shutil.copy2(elf_file, os.path.join(MEM_DIR, "code.elf"))
-    shutil.copy2(src_file, os.path.join(MEM_DIR, PROGRAMS[prog_name]))
+    # Copy to feature_1/mem and feature_2/mem
+    for mem_dir in [F1_MEM_DIR, F2_MEM_DIR]:
+        os.makedirs(mem_dir, exist_ok=True)
+        shutil.copy2(imem_hex, os.path.join(mem_dir, "imem.hex"))
+        shutil.copy2(dmem_hex, os.path.join(mem_dir, "dmem.hex"))
+        shutil.copy2(dis_file, os.path.join(mem_dir, "code.dis"))
+        shutil.copy2(elf_file, os.path.join(mem_dir, "code.elf"))
+        shutil.copy2(src_file, os.path.join(mem_dir, PROGRAMS[prog_name]))
     
-    print(f"[+] Successfully built and deployed {prog_name} to feature_1/mem/")
+    print(f"[+] Successfully built and deployed {prog_name} to feature_1/mem/ and feature_2/mem/")
 
 if __name__ == "__main__":
     prog = sys.argv[1] if len(sys.argv) > 1 else "addition"

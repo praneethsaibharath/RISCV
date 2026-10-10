@@ -161,13 +161,28 @@ def print_fpga_instructions():
     print("=" * 95 + "\n")
 
 def main():
+    parser = argparse.ArgumentParser(description="Feature 2: RV32M Multiplier Visualizer & FPGA Mapping")
+    parser.add_argument("target", nargs="?", default="multiplication",
+                        help="Target test (multiplication, addition, fibonacci, sort, negative, xor, etc.)")
+    args = parser.parse_args()
+    target = args.target
+
+    # Build target if build_hex.py is available
+    build_script = os.path.join(C_TESTS_DIR, "build_hex.py")
+    if os.path.exists(build_script):
+        print(f"[*] Building benchmark program '{target}' via build_hex.py...")
+        try:
+            subprocess.check_call([sys.executable, build_script, target])
+        except Exception as e:
+            print(f"[-] Build failed: {e}")
+
     imem_hex = os.path.join(MEM_DIR, "imem.hex")
     if not os.path.exists(imem_hex):
         print("[-] Error: imem.hex not found in feature_2/mem/")
         return
     imem_map = load_imem_map(imem_hex)
     print("=" * 115)
-    print("       FEATURE 2: RV32M HARDWARE MULTIPLIER (DSP48E1 & RADIX-4 BOOTH) - FPGA VISUALIZER")
+    print(f"       FEATURE 2: RV32M HARDWARE MULTIPLIER (DSP48E1 & RADIX-4 BOOTH) - FPGA VISUALIZER ({target.upper()})")
     print("=" * 115)
     print_imem_listing(imem_map)
     print_fpga_instructions()

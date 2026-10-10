@@ -1,6 +1,7 @@
 # Vivado / Simulator Artifacts
 *.log
 *.jou
+*.str
 *.pb
 *.wdb
 *.vcd

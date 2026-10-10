@@ -11,7 +11,7 @@
 // ----------------------------------------------------------------------------
 module instr_mem
 #(
-    parameter HEX_FILE = "C:/CS2202L/RISCV/feature_1/mem/imem.hex",
+    parameter HEX_FILE = "imem.hex",
     parameter WORDS    = 1024
 )
 (
@@ -20,8 +20,8 @@ module instr_mem
     output wire [31:0] instr   // Fetched instruction
 );
 
-    // 1024 words = 4 KB memory
-    (* ram_style = "block" *)
+    // 1024 words = 4 KB memory (distributed RAM / LUT ROM for combinational read)
+    (* ram_style = "distributed" *)
     reg [31:0] imem [0:WORDS-1];
 
     initial begin
@@ -41,7 +41,7 @@ endmodule
 // ----------------------------------------------------------------------------
 module data_mem
 #(
-    parameter HEX_FILE = "C:/CS2202L/RISCV/feature_1/mem/dmem.hex",
+    parameter HEX_FILE = "dmem.hex",
     parameter WORDS    = 1024
 )
 (
