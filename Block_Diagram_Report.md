@@ -14,179 +14,446 @@
 
 ## 1. Top-Level Hardware Block Diagram
 
-```text
-===================================================================================================================================================================
-                                                  TOP-LEVEL HARDWARE BLOCK DIAGRAM: RV32IMF 5-STAGE PIPELINED CORE
-===================================================================================================================================================================
+The complete top-level hardware block diagram for the Group 13 Extended RV32IMF 5-stage pipelined processor core is illustrated below in comprehensive ASCII schematic form and structural Mermaid dataflow form. All 5 pipeline stages (**IF**, **ID**, **EX**, **MEM**, **WB**), 4 pipeline register sets (**IF/ID**, **ID/EX**, **EX/MEM**, **MEM/WB**), global clock/reset distribution, complete signal names, bit widths, control buses, hazard interlocks, and the 9 integrated feature modules are fully delineated.
 
-       +--------------------------------------------------------------------------------------------------------------------------------------------------+
-       |                                                 Feature 7: Static 32-Entry Branch Target Buffer (BTB)                                            |
-       +--------------------------------------------------------------------------------------------------------------------------------------------------+
-                                        | pc[31:0]                                                                       ^ actual_target[31:0]
-                                        v                                                                                | actual_taken / update_pc
-                                  [btb_hit, btb_target[31:0]]                                                            |
-                                        |                                                                                |
-                                        +---------------------------------------+                                        |
-                                                                                |                                        |
-     +--------------------------------------------------------------------+     |                                        |
-     |                                                                    |     |                                        |
-     |   +-------------------+                                            v     v                                        |
-     +-->| 0                 |                                         +-------------+                                   |
-         |   PC Multiplexer  |----->[ pc_next[31:0] ]----------------->|   PC Reg    |                                   |
-     +-->| 1 (branch_target) |                                         |   [31:0]    |--+                                |
-     |   +-------------------+                                         +-------------+  |                                |
-     |             ^                                                          ^         | pc[31:0]                       |
-     |             | branch_taken                                             | clk,rst |                                |
-     |             |                                                    (~pc_stall)     +--------------------+           |
-     |             |                                                                    |                    |           |
-     |             |                                                                    v                    v           |
-     |             |                                                             +--------------+     +--------------+   |
-     |             |                                                             |  Adder (+4)  |     |  Feature 3:  |   |
-     |             |                                                             +--------------+     |  L1 I-Cache  |   |
-     |             |                                                                    |             | (Direct-Map) |   |
-     |             |                                                        pc_plus_4   |             +--------------+   |
-     |             |                                                          [31:0]    |                    |           |
-     |             |                                                                    |         instr[31:0]|           |
-     |             |                                                                    |         icache_stall           |
-     |             |                                                                    v                    v           |
-=====|=============|==================================================================[ IF/ID PIPELINE REGISTER ]======|===
-     |             |                                                                    |                    |           |
-     |             |                                                          pc_plus_4 |        instr[31:0] |           |
-     |             |                                                                    v                    v           |
-     |             |                                                                          +----------------------+   |
-     |             |                                                                          |     Control Unit     |   |
-     |             |                                                                          +----------------------+   |
-     |             |                                                                                     | Control Lines |
-     |             |                                                                                     v (EX, MEM, WB) |
-     |             |                                           +------------------------------------+    |               |
-     |             |                                           |     Register File (x0 - x31)       |    |               |
-     |             |                                           |        Dual Read / 1 Write         |    |               |
-     |             |                                           +------------------------------------+    |               |
-     |             |                                              | rs1_data[31:0]    | rs2_data[31:0]   |               |
-     |             |                                              v                   v                  |               |
-     |             |       +------------------------------------+ |                   |                  |               |
-     |             |       |    HAZARD DETECTION UNIT           | |                   |                  |               |
-     |             |       | - Load-Use Stall Logic             | |                   |                  |               |
-     |             |       | - Divider / FPU Multi-Cycle Stall  | |                   |                  |               |
-     |             |       | - I-Cache & D-Cache Stall Interlock| |                   |                  |               |
-     |             |       +------------------------------------+ |                   |                  |               |
-     |             |          | pc_stall, if_id_stall             |                   |                  |               |
-     |             |          | id_ex_flush, if_id_flush          |                   |                  |               |
-     |             |          v                                   v                   v                  v               |
-=====|=============|============================================[ ID/EX PIPELINE REGISTER ]==============================|===
-     |             |                                              | rs1_data          | rs2_data         | Control       |
-     |             |                                              v                   v                  v               |
-     |             |        ForwardA [1:0]                     +--------+          +--------+                            |
-     |             |        +--------------------------------->| Mux A  |          | Mux B  |<---------------------------+ ForwardB [1:0]
-     |             |        |                                  +--------+          +--------+                            |
-     |             |        |                                       | op1_fwd           | op2_fwd                        |
-     |             |        |                                       +--------+   +------+--------+                       |
-     |             |        |                                                |   |               |                       |
-     |             |        |                                                v   v               v                       |
-     |             |        |                                         +-------------+    +---------------+               |
-     |             |        |   +------------------------------------>| Base ALU    |    |  ALUSrcB Mux  |               |
-     |             |        |   |                                     | (RV32I)     |    +---------------+               |
-     |             |        |   |                                     +-------------+            | alu_in_b              |
-     |             |        |   |                                            |                   v                       |
-     |             |        |   |                                            |    +-----------------------------+        |
-     |             |        |   |                                            |    | Feature 2: HW Multiplier    |        |
-     |             |        |   |                                            |    | (Radix-4 Booth / DSP48E2)   |        |
-     |             |        |   |                                            |    +-----------------------------+        |
-     |             |        |   |                                            |                   | mul_out[31:0]         |
-     |             |        |   |                                            |    +-----------------------------+        |
-     |             |        |   |                                            |    | Feature 5: HW Divider       |        |
-     |             |        |   |                                            |    | (Radix-2 Non-Restoring)     |        |
-     |             |        |   |                                            |    +-----------------------------+        |
-     |             |        |   |                                            |                   | div_out, div_busy     |
-     |             |        |   |                                            |    +-----------------------------+        |
-     |             |        |   |                                            |    | Feature 4: IEEE 754 FPU     |        |
-     |             |        |   |                                            |    | (Single-Precision 32-bit)   |        |
-     |             |        |   |                                            |    +-----------------------------+        |
-     |             |        |   |                                            |                   | fpu_out, fpu_busy     |
-     |             |        |   |                                            |    +-----------------------------+        |
-     |             |        |   |                                            |    | Feature 9: Bit-Manip (Zbb)  |        |
-     |             |        |   |                                            |    | (CLZ, CTZ, CPOP, MIN, MAX)  |        |
-     |             |        |   |                                            |    +-----------------------------+        |
-     |             |        |   |                                            |                   | zbb_out[31:0]         |
-     |             |        |   |                                            v                   v                       |
-     |             |        |   |                                        +----------------------------------+                |
-     |             |        |   |                                        |     Execution Output Multiplexer |                |
-     |             |        |   |                                        +----------------------------------+                |
-     |             |        |   |                                                          | ex_result[31:0]                 |
-     |             |        |   |     +----------------------------+                       |                                 |
-     |             |        |   |     | Branch & Jump Unit (EX)    |                       |                                 |
-     |             |        |   |     | - Target Adder: pc + imm   |                       |                                 |
-     |             |        |   |     | - Condition Comparator     |                       |                                 |
-     |             |        |   |     +----------------------------+                       |                                 |
-     |             |        |   |       | branch_target[31:0]                              |                                 |
-     |             |        |   |       | branch_taken                                     |                                 |
-     |             +--------|---|-------|--------------------------------------------------+                                 |
-     +----------------------+   |       |                                                  |                                 |
-                                |       v                                                  v                                 |
-================================|=====[ EX/MEM PIPELINE REGISTER ]===========================================================|===
-                                |       |                                                  |                                 |
-                                |       | EX/MEM Forward Bus [31:0]                        v ex_result (dmem_addr)           |
-                                +-------+---------------------------------------->+------------------+                       |
-                                                                                 | Feature 6:       |                       |
-                                                                                 | L1 D-Cache       |                       |
-                                                                                 | (Direct-Mapped)  |                       |
-                                                                                 +------------------+                       |
-                                                                                          | dmem_rdata[31:0]                 |
-                                                                                          | dcache_stall                     |
-                                                                                          v                                  |
-===============================================================================[ MEM/WB PIPELINE REGISTER ]==================|===
-                                                                                          |                                  |
-                                                                                          | MEM/WB Forward Bus [31:0]        |
-                                                                                          +----------------------------------+
-                                                                                          |
-                                      +---------------------------------------------+     |
-                                      | Feature 8: Performance Counters (Passive)   |     |
-                                      | CSRs: cycle, instret, stalls, misses        |     |
-                                      +---------------------------------------------+     |
-                                                             | csr_rdata[31:0]            |
-                                                             v                            v
-                                                     +--------------------------------------------+
-                                                     |        Writeback Multiplexer (4-to-1)      |
-                                                     +--------------------------------------------+
-                                                                            | wb_data [31:0]
-                                                                            v
-                                             +------------------------------------------------------------+
-                                             | Routed back to Register File Port rd & WB-to-ID Bypass Bus |
-                                             +------------------------------------------------------------+
-===================================================================================================================================================================
+An interactive, high-resolution vector visualizer is available in [block_diagram_visualizer.html](file:///c:/CS2202L/RISCV/block_diagram_visualizer.html).
+
+### Comprehensive Hardware Architecture ASCII Schematic
+
+```text
+===================================================================================================================================================================================
+                                              TOP-LEVEL HARDWARE BLOCK DIAGRAM: EXTENDED RV32IMF 5-STAGE PIPELINED CORE
+===================================================================================================================================================================================
+
+===================================================================================================================================================================================
+ GLOBAL CLOCK & SYNCHRONOUS ACTIVE-LOW RESET DISTRIBUTION BUS:
+   clk     (100 MHz) --------+--------------------+---------------------+--------------------+--------------------+--------------------+--------------------+----------------->
+                             |                    |                     |                    |                    |                    |                    |
+   reset_n (Active-Low) -----+--------------------+---------------------+--------------------+--------------------+--------------------+--------------------+----------------->
+                             |                    |                     |                    |                    |                    |                    |
+                             v                    v                     v                    v                    v                    v                    v
+                        +---------+          +---------+           +---------+          +---------+          +---------+          +---------+          +---------+
+                        | PC Reg  |          |  IF/ID  |           | RegFile |          |  ID/EX  |          | DIV/FPU |          | EX/MEM  |          | D-Cache |  (and MEM/WB,
+                        | & Caches|          |   Reg   |           | & BTB   |          |   Reg   |          | Modules |          |   Reg   |          | & CSRs) |   Reg, CSRs)
+===================================================================================================================================================================================
+
+   STAGE 1: INSTRUCTION FETCH (IF)                                                STAGE 2: INSTRUCTION DECODE (ID)
+  --------------------------------------------------                             -----------------------------------------------------------------------------
+                                                                                                                              +------------------------------+
+  +------------------------------------------------+                                                                          |    CONTROL UNIT              |
+  | Feature 7: Static 32-Entry Branch Target Buffer|                                                                          |    (Opcode / Funct3 / Funct7)|
+  | - Tag Array: 32 entries [31:7]                 |                                                                          +------------------------------+
+  | - Target Cache: [31:0]                         |                                                                                         |
+  +------------------------------------------------+                                                                                         | Control Buses
+           | pc[31:0]            ^ [update_pc, target,                                                                                       v
+           v                     |  actual_taken from EX]                                                 +----------------------------------------------------------+
+     [btb_hit, btb_target[31:0]] |                                                                        | Control Lines Generated:                                 |
+           |                     |                                                                        | - EX  : ALUSrcA, ALUSrcB, ALUOp[3:0], Branch, Jump       |
+           v                     |                                                                        | - Math: is_mul, is_div, is_fpu, is_zbb                     |
+      +----------+               |                                                                        | - MEM : MemRead, MemWrite                                |
+  +-->|00: pc+4  |               |                                                                        | - WB  : RegWrite, MemToReg[1:0], is_csr                  |
+  +-->|01: btb   |               |                                                                        +----------------------------------------------------------+
+  +-->|10: branch|               |                                                                                                   |
+  +-->|11: jalr  |               |                                                                                                   v
+      +----------+               |                                                  instr[31:0]                              [ Control Signals ]
+           | pc_next[31:0]       |                                                       |                                                   |
+           v                     |                       +-------------------------------+-------------------------------+                   |
+     +-----------+               |                       | instr[19:15]  | instr[24:20]  | instr[31:0]   | instr[11:7]   |                   |
+     |  PC Reg   |               |                       v rs1[4:0]      v rs2[4:0]      v               v rd[4:0]       v                   |
+     |  [31:0]   |               |                   +-------------------------------+ +---------------+ |             +-------------------+ |
+     +-----------+               |                   | Register File (x0 - x31)      | | Immediate     | |             | HAZARD DETECTION  | |
+       |       |                 |                   | - Dual 32-bit Read Ports      | | Generator     | |             | UNIT              | |
+       |       | pc[31:0]        |                   | - Single 32-bit Write Port    | | (I,S,B,U,J)   | |             +-------------------+ |
+       |       +---------------+ |                   +-------------------------------+ +---------------+ |               | Inputs:           | |
+       v                       | |                      | rdata1[31:0]  | rdata2[31:0]   | imm[31:0]     |               | - id_rs1, id_rs2  | |
+  +---------+                  v |                      v               v                v               |               | - id_ex_rd, mem_rd| |
+  | Add (+4)|    +-------------------------------+      |               |                |               |               | - div_busy        | |
+  +---------+    | Feature 3: L1 I-Cache         |      |               |                |               |               | - fpu_busy        | |
+       |         | - 2 KB Direct-Mapped (16B L)  |      |               |                |               |               | - icache_stall    | |
+       | pc+4    | - 1-Cycle Hit SRAM            |      |               |                |               |               | - dcache_stall    | |
+       | [31:0]  | - Burst Refill FSM to Memory  |      |               |                |               |               | - branch_taken    | |
+       |         +-------------------------------+      |               |                |               |               +-------------------+ |
+       |               | instr[31:0]   | icache_stall   |               |                |               |                 | Outputs:          |
+       |               v               v                |               |                |               |                 | - pc_stall        |
+       |               |         (to Hazard Unit)       |               |                |               |                 | - if_id_stall     |
+       |               |                                |               |                |               |                 | - id_ex_flush     |
+       |               |                                |               |                |               |                 | - if_id_flush     |
+       |               |                                |               |                |               |                 v                   v
+=======v===============v================================v===============v================v===============v=================[ ID/EX PIPELINE REGISTER ]======
+  [ IF/ID PIPELINE REGISTER ]                           | rs1_data      | rs2_data       | imm           | rd              | Control Flags     |
+  - pc[31:0]                                            | [31:0]        | [31:0]         | [31:0]        | [4:0]           | (EX, MEM, WB)     |
+  - pc_plus_4[31:0]                                     +-------+-------+--------+-------+-------+-------+--------+--------+---------+---------+
+  - instr[31:0]                                                 |                |               |                |                  |
+  Controls: clk, reset_n, ~if_id_stall, if_id_flush             |                |               |                |                  |
+================================================================|================|===============|================|==================|=================
+
+   STAGE 3: EXECUTE (EX)
+  -----------------------------------------------------------------------------------------------------------------------------------------------------
+                           ForwardA [1:0]                               ForwardB [1:0]
+                                 |                                            |
+                                 v                                            v
+                         +---------------+                            +---------------+
+                         | Forward Mux A |                            | Forward Mux B |<--------+ [mem_wdata to EX/MEM]
+                         | (3-to-1, 32b) |                            | (3-to-1, 32b) |         |
+                         +---------------+                            +---------------+         |
+                           | op_a_fwd[31:0]                             | op_b_fwd[31:0]        |
+               +-----------+-----------+                     +----------+-----------+-----------+
+               |                       |                     |                      |
+               v                       v                     v                      v
+        +-------------+         +-------------+       +-------------+        +-------------+
+        | ALUSrcA Mux |         | ALU_A Bus   |       | ALUSrcB Mux |        | ALU_B Bus   |
+        | (0:rs1,1:pc)|         | [31:0]      |       | (0:rs2,1:imm|        | [31:0]      |
+        +-------------+         +-------------+       +-------------+        +-------------+
+               |                       |                     |                      |
+               v alu_in_a              |                     v alu_in_b             |
+       +-------------------------------+                     +----------------------+
+       |
+       |  ======================== PARALLEL HARDWARE EXECUTION UNITS ========================
+       |
+       +---> [1] BASE ALU (RV32I) : ADD, SUB, SLT, SLTU, XOR, OR, AND, SLL, SRL, SRA ------> base_alu_out[31:0] ------+
+       |                                                                                                              |
+       +---> [2] FEATURE 2: HARDWARE MULTIPLIER (Radix-4 Booth / DSP48E2 Slices) -----------> mul_out[31:0] ----------+
+       |         Instructions: MUL, MULH, MULHSU, MULHU (Single-Cycle Latency)                                        |
+       |                                                                                                              |
+       +---> [3] FEATURE 5: HARDWARE DIVIDER (Multi-Cycle Radix-2 Non-Restoring) -----------> div_out[31:0] ----------+
+       |         Instructions: DIV, DIVU, REM, REMU (32 cycles, div_busy handshaking)           [div_busy to Hazard]   |
+       |                                                                                                              |
+       +---> [4] FEATURE 4: IEEE 754 SINGLE-PRECISION FPU (32-bit Float Processing) --------> fpu_out[31:0] ----------+
+       |         Instructions: FADD.S, FSUB.S, FMUL.S, FDIV.S (fpu_busy handshaking)            [fpu_busy to Hazard]   |
+       |                                                                                                              |
+       +---> [5] FEATURE 9: BIT-MANIPULATION UNIT (Zbb Extension) --------------------------> zbb_out[31:0] ----------+
+       |         Instructions: CLZ, CTZ, CPOP, MIN/MAX, SEXT, ANDN, ORN, XNOR, ROL/ROR                                |
+       |                                                                                                              |
+       +---> [6] LINK ADDRESS RETURN BUS : pass-through of id_ex_pc_plus_4[31:0] -----------> pc_plus_4[31:0] --------+
+                                                                                                                      |
+                                                                                                                      v
+                                                                                                        +----------------------------+
+                                                                                                        | EX RESULT MULTIPLEXER      |
+                                                                                                        | (6-to-1, 32-bit Output)    |
+                                                                                                        +----------------------------+
+                                                                                                                      | ex_result[31:0]
+       +--------------------------------------------------------------------------------------------------------------+
+       |
+       v
+  +-----------------------------------------------------------------------------------+
+  | BRANCH & JUMP EVALUATION UNIT (EX Stage)                                          |
+  | - Target Adder 1: id_ex_pc + id_ex_imm                                            |======> actual_target[31:0] (Feedback to IF PC Mux)
+  | - Target Adder 2: (op_a_fwd + id_ex_imm) & ~1 (for JALR)                          |
+  | - Condition Comparator: BEQ, BNE, BLT, BGE, BLTU, BGEU                            |======> branch_taken / mispredict (to IF & Hazard)
+  +-----------------------------------------------------------------------------------+
+
+=======================================================================================================================================================
+ [ EX/MEM PIPELINE REGISTER ]
+ - pc_plus_4[31:0]               - ex_result[31:0] (dmem_addr)
+ - mem_wdata[31:0]               - rd[4:0], funct3[2:0]
+ - Control Signals               : RegWrite, MemRead, MemWrite, MemToReg[1:0], is_csr
+ Controls: clk, reset_n, enable ~dcache_stall
+=======================================================================================================================================================
+
+   STAGE 4: MEMORY ACCESS (MEM)                                                   STAGE 5: WRITEBACK (WB)
+  -------------------------------------------------------------                  ------------------------------------------------------
+                           ex_result[31:0] (dmem_addr)
+                                 |
+        +------------------------+-----------------------------+
+        |                                                      |
+        v                                                      |
+  +----------------------------------------------------+       |
+  | STORE BYTE-ENABLE GENERATOR                        |       |
+  | Funct3 (SB, SH, SW) + addr[1:0] -> dmem_wstrb[3:0] |       |
+  +----------------------------------------------------+       |
+        | dmem_wstrb[3:0]                                      |
+        v                                                      |
+  +----------------------------------------------------+       |
+  | FEATURE 6: L1 DATA CACHE (Direct-Mapped, 2 KB)     |       |
+  | - Tag SRAM Array & 16B Line Data BRAMs             |       |
+  | - Write-Through Policy with Write Buffer           |       |
+  | - Memory Refill Bus (Burst 128-bit) to BRAM/DDR    |       |
+  +----------------------------------------------------+       |
+        | raw_rdata[31:0]         | dcache_stall               |
+        v                         v (to Hazard Unit)           |
+  +---------------------------+                                |
+  | LOAD SIGN/ZERO EXTENDER   |                                |
+  | LB, LBU, LH, LHU, LW      |                                |
+  +---------------------------+                                |
+        | formatted_rdata[31:0]                                |
+        |                                                      |
+        v                                                      v
+=======================================================================================================================================================
+ [ MEM/WB PIPELINE REGISTER ]
+ - pc_plus_4[31:0]               - formatted_mem_data[31:0]
+ - ex_result[31:0]               - csr_rdata[31:0]
+ - rd[4:0]                       - Control: RegWrite, MemToReg[1:0]
+ Controls: clk, reset_n
+=======================================================================================================================================================
+                                                                                        |             |               |              |
+                                                                                        v             v               v              v
+                                                                                 +-----------------------------------------------------------+
+                                                                                 | FEATURE 8: PERFORMANCE COUNTERS (Passive CSRs)            |
+                                                                                 | CSR Addresses: 0xC00(CYCLE), 0xC02(INSTRET), 0xC80-0xC82  |
+                                                                                 | Profiling: cycle[63:0], instret[63:0], stalls, misses     |
+                                                                                 +-----------------------------------------------------------+
+                                                                                                              | csr_rdata[31:0]
+                                                                                                              v
+                                                                                               +------------------------------+
+                                                                                               | WRITEBACK MULTIPLEXER (4:1)  |
+                                                                                               | Select: MemToReg[1:0]        |
+                                                                                               | - 00: ex_result[31:0]        |
+                                                                                               | - 01: mem_data[31:0]         |
+                                                                                               | - 10: pc_plus_4[31:0]        |
+                                                                                               | - 11: csr_rdata[31:0]        |
+                                                                                               +------------------------------+
+                                                                                                              | wb_data[31:0]
+                                                                                                              v
+=======================================================================================================================================================
+ FEEDBACK BYPASS & RETIREMENT BUSES:
+ 1. Writeback to RegFile : wb_data[31:0], mem_wb_rd[4:0], mem_wb_regwrite -----------------------------------------------------> [RegFile wdata/waddr/we in ID]
+ 2. EX/MEM Forward Bus   : Distance-1 Forwarding [ex_mem_result, ex_mem_rd, ex_mem_regwrite] ------------------------------------> [Forward Muxes in EX Stage]
+ 3. MEM/WB Forward Bus   : Distance-2 Forwarding [wb_data, mem_wb_rd, mem_wb_regwrite] -----------------------------------------> [Forward Muxes in EX Stage]
+=======================================================================================================================================================
 ```
+
+---
+
+### Structural Pipeline Flow Diagram (Mermaid)
+
+```mermaid
+flowchart TD
+    %% Global Network
+    subgraph CLK_TREE ["Global Clock & Reset Distribution Bus"]
+        CLK["clk: 100 MHz Master Oscillator"]
+        RST["reset_n: Synchronous Active-Low Reset"]
+    end
+
+    %% STAGE 1: IF
+    subgraph STAGE_IF ["Stage 1: Instruction Fetch (IF)"]
+        direction TB
+        PCMUX{"PC Multiplexer (4:1)"}
+        PCREG["PC Register [31:0]"]
+        ADD4["Adder (+4)"]
+        ICACHE["Feature 3: L1 I-Cache (2 KB Direct-Mapped)"]
+        BTB["Feature 7: Static 32-Entry BTB"]
+    end
+
+    %% IF/ID Register
+    subgraph REG_IF_ID ["IF / ID Pipeline Register"]
+        IF_ID_PC["pc [31:0]"]
+        IF_ID_PC4["pc_plus_4 [31:0]"]
+        IF_ID_INSTR["instr [31:0]"]
+    end
+
+    %% STAGE 2: ID
+    subgraph STAGE_ID ["Stage 2: Instruction Decode (ID)"]
+        direction TB
+        CTRL["Control Unit (Opcode/Funct3/Funct7)"]
+        RF["Register File (32 x 32-bit x0-x31)"]
+        IMMGEN["Immediate Generator (I/S/B/U/J)"]
+        HAZARD["Hazard Detection Unit"]
+    end
+
+    %% ID/EX Register
+    subgraph REG_ID_EX ["ID / EX Pipeline Register"]
+        ID_EX_DATA["pc, pc_plus_4, rs1_data, rs2_data, imm [31:0], rs1, rs2, rd [4:0]"]
+        ID_EX_CTRL["RegWrite, MemRead, MemWrite, MemToReg, ALUSrc, ALUOp, Math flags"]
+    end
+
+    %% STAGE 3: EX
+    subgraph STAGE_EX ["Stage 3: Execute (EX)"]
+        direction TB
+        FWD_UNIT["Forwarding Unit"]
+        MUXA{"Forward Mux A (3:1)"}
+        MUXB{"Forward Mux B (3:1)"}
+        ALU_SRCA{"ALUSrcA Mux"}
+        ALU_SRCB{"ALUSrcB Mux"}
+        BASE_ALU["Base ALU (RV32I)"]
+        F2_MUL["Feature 2: Radix-4 Booth Multiplier"]
+        F5_DIV["Feature 5: Radix-2 Non-Restoring Divider"]
+        F4_FPU["Feature 4: IEEE 754 Single-Precision FPU"]
+        F9_ZBB["Feature 9: Bit-Manipulation Unit (Zbb)"]
+        BRANCH_UNIT["Branch & Jump Evaluation Unit"]
+        EX_MUX{"EX Result Multiplexer (6:1)"}
+    end
+
+    %% EX/MEM Register
+    subgraph REG_EX_MEM ["EX / MEM Pipeline Register"]
+        EX_MEM_DATA["pc_plus_4 [31:0], ex_result [31:0], mem_wdata [31:0], rd [4:0]"]
+        EX_MEM_CTRL["RegWrite, MemRead, MemWrite, MemToReg [1:0], is_csr"]
+    end
+
+    %% STAGE 4: MEM
+    subgraph STAGE_MEM ["Stage 4: Memory Access (MEM)"]
+        direction TB
+        STRB_GEN["Store Byte-Enable Generator"]
+        DCACHE["Feature 6: L1 D-Cache (2 KB Direct-Mapped)"]
+        LOAD_EXT["Load Sign/Zero Extender & Formatter"]
+    end
+
+    %% MEM/WB Register
+    subgraph REG_MEM_WB ["MEM / WB Pipeline Register"]
+        MEM_WB_DATA["pc_plus_4 [31:0], ex_result [31:0], mem_rdata [31:0], rd [4:0]"]
+        MEM_WB_CTRL["RegWrite, MemToReg [1:0]"]
+    end
+
+    %% STAGE 5: WB
+    subgraph STAGE_WB ["Stage 5: Writeback (WB)"]
+        direction TB
+        CSR_PERF["Feature 8: Passive Performance CSRs"]
+        WB_MUX{"Writeback Multiplexer (4:1)"}
+    end
+
+    %% Connections
+    PCMUX -->|"pc_next [31:0]"| PCREG
+    PCREG -->|"pc [31:0]"| ADD4
+    PCREG -->|"pc [31:0]"| ICACHE
+    PCREG -->|"pc [31:0]"| BTB
+    ADD4 -->|"pc_plus_4 [31:0]"| PCMUX
+    BTB -->|"btb_target [31:0] (on btb_hit)"| PCMUX
+
+    ADD4 --> IF_ID_PC4
+    PCREG --> IF_ID_PC
+    ICACHE -->|"instr [31:0]"| IF_ID_INSTR
+
+    IF_ID_INSTR -->|"opcode [6:0], funct3 [2:0], funct7 [6:0]"| CTRL
+    IF_ID_INSTR -->|"rs1 [4:0]"| RF
+    IF_ID_INSTR -->|"rs2 [4:0]"| RF
+    IF_ID_INSTR -->|"instr [31:0]"| IMMGEN
+    IF_ID_INSTR -->|"rs1 [4:0], rs2 [4:0]"| HAZARD
+
+    CTRL --> ID_EX_CTRL
+    RF -->|"rs1_data [31:0], rs2_data [31:0]"| ID_EX_DATA
+    IMMGEN -->|"imm [31:0]"| ID_EX_DATA
+
+    REG_ID_EX --> MUXA
+    REG_ID_EX --> MUXB
+    FWD_UNIT -->|"forward_a [1:0]"| MUXA
+    FWD_UNIT -->|"forward_b [1:0]"| MUXB
+
+    MUXA -->|"op_a_fwd [31:0]"| ALU_SRCA
+    MUXB -->|"op_b_fwd [31:0]"| ALU_SRCB
+
+    ALU_SRCA --> BASE_ALU
+    ALU_SRCB --> BASE_ALU
+    MUXA --> F2_MUL
+    MUXB --> F2_MUL
+    MUXA --> F5_DIV
+    MUXB --> F5_DIV
+    MUXA --> F4_FPU
+    MUXB --> F4_FPU
+    MUXA --> F9_ZBB
+    MUXB --> F9_ZBB
+    MUXA --> BRANCH_UNIT
+    MUXB --> BRANCH_UNIT
+
+    BASE_ALU --> EX_MUX
+    F2_MUL -->|"mul_out [31:0]"| EX_MUX
+    F5_DIV -->|"div_out [31:0]"| EX_MUX
+    F4_FPU -->|"fpu_out [31:0]"| EX_MUX
+    F9_ZBB -->|"zbb_out [31:0]"| EX_MUX
+
+    F5_DIV -.->|"div_busy (32-cycle hold)"| HAZARD
+    F4_FPU -.->|"fpu_busy"| HAZARD
+    ICACHE -.->|"icache_stall"| HAZARD
+    DCACHE -.->|"dcache_stall"| HAZARD
+
+    BRANCH_UNIT -->|"actual_target [31:0]"| PCMUX
+    BRANCH_UNIT -->|"branch_taken / mispredict"| HAZARD
+    BRANCH_UNIT -->|"update_pc, target, taken"| BTB
+
+    HAZARD -->|"pc_stall"| PCREG
+    HAZARD -->|"if_id_stall, if_id_flush"| REG_IF_ID
+    HAZARD -->|"id_ex_flush"| REG_ID_EX
+
+    EX_MUX -->|"ex_result [31:0]"| REG_EX_MEM
+    MUXB -->|"mem_wdata [31:0]"| REG_EX_MEM
+
+    REG_EX_MEM -->|"ex_result (addr) [31:0]"| DCACHE
+    REG_EX_MEM -->|"mem_wdata [31:0]"| DCACHE
+    REG_EX_MEM -->|"funct3 [2:0]"| STRB_GEN
+    STRB_GEN -->|"dmem_wstrb [3:0]"| DCACHE
+    DCACHE -->|"raw_rdata [31:0]"| LOAD_EXT
+    LOAD_EXT -->|"formatted_rdata [31:0]"| REG_MEM_WB
+    REG_EX_MEM -->|"ex_result bypass [31:0]"| REG_MEM_WB
+
+    REG_EX_MEM -.->|"Distance-1 Bypass [31:0]"| FWD_UNIT
+    REG_MEM_WB -.->|"Distance-2 Bypass [31:0]"| FWD_UNIT
+
+    REG_MEM_WB --> WB_MUX
+    CSR_PERF -->|"csr_rdata [31:0]"| WB_MUX
+
+    WB_MUX -->|"wb_data [31:0]"| RF
+```
+
+---
 
 ### Architectural Signal and Bus Width Definitions
 
-| Signal Name | Source Module | Destination | Width | Function / Description |
+| Signal Name | Source Module | Destination Module(s) | Bit Width | Hardware Function / Operational Description |
 |---|---|---|:---:|---|
-| `pc` | PC Register | L1 I-Cache, Adder, BTB | 32 bits | Current program counter address |
-| `pc_plus_4` | Adder (+4) | IF/ID Register, PC Mux | 32 bits | Sequential next instruction address |
-| `instr` | L1 I-Cache | IF/ID Register | 32 bits | Fetched instruction machine word |
-| `btb_target` | Static 32-entry BTB | PC Multiplexer | 32 bits | Predicted branch target address on BTB hit |
-| `btb_hit` | Static 32-entry BTB | Fetch Control | 1 bit | Active high when PC matches an entry in the BTB |
-| `rs1_data`, `rs2_data`| Register File | ID/EX Register | 32 bits | Source register operand values from dual read ports |
-| `imm` | Imm Generator | ID/EX Register | 32 bits | Sign-extended 32-bit immediate for I/S/B/U/J types |
-| `pc_stall` | Hazard Unit | PC Register Enable | 1 bit | Active high freeze signal for PC register on stalls |
-| `if_id_stall` | Hazard Unit | IF/ID Register Enable | 1 bit | Active high hold signal for IF/ID register on stalls |
-| `id_ex_flush` | Hazard Unit | ID/EX Sync Clear | 1 bit | Injects synchronous bubble (NOP) into ID/EX on hazard |
-| `if_id_flush` | Hazard Unit | IF/ID Sync Clear | 1 bit | Injects synchronous bubble into IF/ID on branch taken |
-| `forward_a`, `forward_b` | Forwarding Unit | Mux A, Mux B | 2 bits | Selects operand bypass (`00`=RF, `01`=EX/MEM, `10`=MEM/WB) |
-| `mul_out` | Feature 2 Multiplier | EX Result Mux | 32 bits | Lower or upper 32 bits of 64-bit product (`MUL`/`MULH`) |
-| `div_out` | Feature 5 Divider | EX Result Mux | 32 bits | Quotient or remainder of 32-bit integer division |
-| `div_busy` | Feature 5 Divider | Hazard Unit | 1 bit | Multi-cycle stall request signal (asserted for 32 cycles) |
-| `fpu_out` | Feature 4 FPU | EX Result Mux | 32 bits | IEEE 754 single-precision float calculation result |
-| `fpu_busy` | Feature 4 FPU | Hazard Unit | 1 bit | Multi-cycle FPU stall request signal |
-| `zbb_out` | Feature 9 Zbb Unit | EX Result Mux | 32 bits | Result of bit manipulation operations (`CLZ`, `CPOP`, etc.) |
-| `branch_taken` | Branch Unit | PC Mux, Hazard Unit | 1 bit | Evaluated branch condition in EX stage |
-| `branch_target`| Branch Unit | PC Mux | 32 bits | Target address calculated in EX stage (`pc_ex + imm`) |
-| `ex_result` | EX Result Mux | EX/MEM Reg, D-Cache | 32 bits | Memory byte address or ALU result |
-| `dmem_rdata` | Feature 6 D-Cache | MEM/WB Register | 32 bits | Data word read from L1 Data Cache |
-| `dcache_stall` | Feature 6 D-Cache | Hazard Unit | 1 bit | Stall request during D-Cache miss burst refill |
-| `icache_stall` | Feature 3 I-Cache | Hazard Unit | 1 bit | Stall request during I-Cache miss burst refill |
-| `csr_rdata` | Feature 8 Counters | WB Multiplexer | 32 bits | Passive performance counter values (`cycle`, `instret`) |
-| `wb_data` | WB Multiplexer | Register File Write | 32 bits | Final retirement result written to `rd` in RegFile |
-| `clk`, `reset_n` | Clock Management | All Modules | 1 bit | 100 MHz oscillator and active-low synchronous reset |
+| `clk` | Master Clock Generator | All Sequential Elements (PC, RegFile, Pipeline Registers, Caches, Divider, FPU, BTB, CSRs) | 1 bit | 100 MHz primary synchronous clock edge |
+| `reset_n` | Reset Synchronizer | All Sequential Elements | 1 bit | Active-low global synchronous system reset |
+| `pc` | PC Register | L1 I-Cache, Adder (+4), Feature 7 BTB, IF/ID Reg | 32 bits | Current program counter instruction address |
+| `pc_plus_4` | Adder (+4) | PC Multiplexer (input `00`), IF/ID Pipeline Register | 32 bits | Sequential next instruction address ($pc + 4$) |
+| `pc_next` | PC Multiplexer (4:1) | PC Register | 32 bits | Target address selected for next fetch cycle |
+| `btb_target` | Feature 7 BTB | PC Multiplexer (input `01`) | 32 bits | Speculative branch target address on BTB cache hit |
+| `btb_hit` | Feature 7 BTB | Fetch Multiplexer Control Logic | 1 bit | Asserted when $pc$ matches a valid entry in the 32-entry BTB |
+| `update_pc` | Branch/Jump Unit (EX) | Feature 7 BTB Update Port | 32 bits | Branch instruction PC passed to update BTB entry |
+| `actual_target` | Branch/Jump Unit (EX) | PC Multiplexer (input `10`), Feature 7 BTB | 32 bits | Actual evaluated branch/jump target address |
+| `actual_taken` | Branch/Jump Unit (EX) | Feature 7 BTB, Hazard Detection Unit | 1 bit | Asserted when conditional branch evaluates TRUE |
+| `instr` | Feature 3 L1 I-Cache | IF/ID Pipeline Register | 32 bits | 32-bit RISC-V machine instruction word fetched from I-Cache |
+| `icache_stall` | Feature 3 L1 I-Cache | Hazard Detection Unit | 1 bit | Hold request asserted during I-Cache miss 16-byte burst refill |
+| `if_id_pc` | IF/ID Pipeline Register | ID/EX Pipeline Register, Branch Adder | 32 bits | Registered program counter of instruction in Decode stage |
+| `if_id_pc_plus_4` | IF/ID Pipeline Register | ID/EX Pipeline Register | 32 bits | Registered sequential link address ($pc + 4$) in Decode |
+| `if_id_instr` | IF/ID Pipeline Register | Control Unit, RegFile, ImmGen, Hazard Unit | 32 bits | Registered instruction word currently being decoded |
+| `opcode` | Instruction Field `[6:0]` | Main Control Unit, Hazard Unit | 7 bits | RV32I/M base and extension opcode identifier |
+| `funct3` | Instruction Field `[14:12]` | Control Unit, ALU Control, Branch Unit, ID/EX Reg | 3 bits | Sub-operation selector for arithmetic, branch, load, store |
+| `funct7` | Instruction Field `[31:25]` | Control Unit, ALU Control, ID/EX Reg | 7 bits | Extended operation selector for math, FPU, and Zbb |
+| `rs1` | Instruction Field `[19:15]` | Register File (Read Port 1), Hazard Unit, ID/EX Reg | 5 bits | Source register 1 address index ($x0 - x31$) |
+| `rs2` | Instruction Field `[24:20]` | Register File (Read Port 2), Hazard Unit, ID/EX Reg | 5 bits | Source register 2 address index ($x0 - x31$) |
+| `rd` | Instruction Field `[11:7]` | ID/EX Pipeline Register | 5 bits | Destination register index for writeback retirement |
+| `rs1_data` | Register File | ID/EX Pipeline Register | 32 bits | Register value read from Port 1 asynchronously |
+| `rs2_data` | Register File | ID/EX Pipeline Register | 32 bits | Register value read from Port 2 asynchronously |
+| `imm` | Immediate Generator | ID/EX Pipeline Register | 32 bits | Sign-extended 32-bit immediate (I, S, B, U, J types) |
+| `pc_stall` | Hazard Detection Unit | PC Register Enable (`~pc_stall`) | 1 bit | Active-high stall freeze holding PC on load-use, cache, or math stalls |
+| `if_id_stall` | Hazard Detection Unit | IF/ID Pipeline Register Enable (`~if_id_stall`)| 1 bit | Active-high stall freeze holding IF/ID register |
+| `id_ex_flush` | Hazard Detection Unit | ID/EX Pipeline Register Synchronous Clear | 1 bit | Injects synchronous bubble (NOP) into ID/EX on hazard or branch |
+| `if_id_flush` | Hazard Detection Unit | IF/ID Pipeline Register Synchronous Clear | 1 bit | Annuls speculative instruction in IF/ID on branch taken |
+| `RegWrite` | Control Unit | ID/EX ➔ EX/MEM ➔ MEM/WB ➔ RegFile `we` | 1 bit | Register write enable asserted for instructions retiring to `rd` |
+| `MemRead` | Control Unit | ID/EX ➔ EX/MEM ➔ D-Cache `re`, Hazard Unit | 1 bit | Data memory read strobe for load instructions (`LB`, `LH`, `LW`) |
+| `MemWrite` | Control Unit | ID/EX ➔ EX/MEM ➔ D-Cache `we` | 1 bit | Data memory write strobe for store instructions (`SB`, `SH`, `SW`) |
+| `MemToReg` | Control Unit | ID/EX ➔ EX/MEM ➔ MEM/WB ➔ WB Mux Select | 2 bits | Selects WB source (`00`: ALU, `01`: Mem, `10`: PC+4, `11`: CSR) |
+| `ALUSrcA` | Control Unit | ID/EX ➔ ALUSrcA Mux | 1 bit | Selects operand A (`0`: forwarded rs1, `1`: PC for AUIPC/JAL) |
+| `ALUSrcB` | Control Unit | ID/EX ➔ ALUSrcB Mux | 1 bit | Selects operand B (`0`: forwarded rs2, `1`: immediate value) |
+| `ALUOp` | Control Unit | ID/EX ➔ ALU Control Logic | 4 bits | Encoded operation category for ALU Control decoder |
+| `Branch` | Control Unit | ID/EX ➔ Branch/Jump Evaluation Unit | 1 bit | Asserted for conditional branch instructions (`B-type`) |
+| `Jump` | Control Unit | ID/EX ➔ Branch/Jump Evaluation Unit | 1 bit | Asserted for unconditional jump instructions (`JAL`, `JALR`) |
+| `is_mul` | Control Unit | ID/EX ➔ Feature 2 Multiplier Unit | 1 bit | Multiplier operation enable strobe |
+| `is_div` | Control Unit | ID/EX ➔ Feature 5 Divider Unit, Hazard Unit | 1 bit | Divider start request strobe initiating 32-cycle FSM |
+| `is_fpu` | Control Unit | ID/EX ➔ Feature 4 FPU Unit, Hazard Unit | 1 bit | Single-precision FPU start request strobe |
+| `is_zbb` | Control Unit | ID/EX ➔ Feature 9 Zbb Unit | 1 bit | Zbb bit-manipulation operation enable strobe |
+| `is_csr` | Control Unit | ID/EX ➔ EX/MEM ➔ MEM/WB ➔ Feature 8 CSR Unit | 1 bit | Performance counter CSR read enable |
+| `forward_a` | Forwarding Unit | Forwarding Multiplexer A Select | 2 bits | Bypass select for operand A (`00`: RF, `01`: EX/MEM, `10`: MEM/WB) |
+| `forward_b` | Forwarding Unit | Forwarding Multiplexer B Select | 2 bits | Bypass select for operand B (`00`: RF, `01`: EX/MEM, `10`: MEM/WB) |
+| `op_a_fwd` | Forwarding Multiplexer A | ALUSrcA Mux, Multiplier, Divider, FPU, Zbb, Branch | 32 bits | Hazard-resolved operand A value fed into EX stage modules |
+| `op_b_fwd` | Forwarding Multiplexer B | ALUSrcB Mux, Multiplier, Divider, FPU, Zbb, Store Bus| 32 bits | Hazard-resolved operand B value (also passes to `mem_wdata`) |
+| `alu_in_a` | ALUSrcA Multiplexer | Base ALU Input A | 32 bits | Final arithmetic operand A (rs1 data or PC) |
+| `alu_in_b` | ALUSrcB Multiplexer | Base ALU Input B | 32 bits | Final arithmetic operand B (rs2 data or immediate) |
+| `base_alu_out` | Base ALU (RV32I) | EX Result Multiplexer (input `000`) | 32 bits | RV32I base arithmetic and logic result |
+| `mul_out` | Feature 2 Multiplier | EX Result Multiplexer (input `001`) | 32 bits | Hardware multiplier output (`MUL`, `MULH`, `MULHSU`, `MULHU`) |
+| `div_out` | Feature 5 Divider | EX Result Multiplexer (input `010`) | 32 bits | Hardware divider quotient or remainder output |
+| `div_busy` | Feature 5 Divider | Hazard Detection Unit | 1 bit | Multi-cycle stall request holding pipeline during 32 division cycles |
+| `fpu_out` | Feature 4 IEEE 754 FPU | EX Result Multiplexer (input `011`) | 32 bits | IEEE 754 float result (`FADD.S`, `FSUB.S`, `FMUL.S`, `FDIV.S`) |
+| `fpu_busy` | Feature 4 IEEE 754 FPU | Hazard Detection Unit | 1 bit | FPU multi-cycle stall request signal |
+| `zbb_out` | Feature 9 Zbb Unit | EX Result Multiplexer (input `100`) | 32 bits | Bit manipulation result (`CLZ`, `CTZ`, `CPOP`, `MIN`, `MAX`) |
+| `ex_result` | EX Result Multiplexer | EX/MEM Reg, Forwarding Distance-1 Bus | 32 bits | Selected execution result (memory address or computational data) |
+| `branch_taken` | Branch/Jump Unit (EX) | PC Multiplexer, Hazard Unit, Feature 7 BTB | 1 bit | Asserted when branch condition is evaluated TRUE |
+| `mem_wdata` | ID/EX Register (`op_b_fwd`)| EX/MEM Register ➔ L1 D-Cache Write Data | 32 bits | Store data operand forwarded from EX stage |
+| `dmem_wstrb` | Store Byte-Enable Gen | Feature 6 L1 D-Cache | 4 bits | Byte write enable mask generated from `funct3` (`SB`, `SH`, `SW`) |
+| `raw_rdata` | Feature 6 L1 D-Cache | Load Sign/Zero Extender & Formatter | 32 bits | Raw 32-bit data word read from L1 D-Cache SRAM array |
+| `dcache_stall` | Feature 6 L1 D-Cache | Hazard Detection Unit | 1 bit | Stall request asserted during D-Cache miss burst refill |
+| `formatted_mem_data`| Load Sign Extender | MEM/WB Pipeline Register | 32 bits | Aligned and sign/zero-extended load data (`LB`, `LH`, `LW`, etc.) |
+| `csr_rdata` | Feature 8 CSR Counters | Writeback Multiplexer (input `11`) | 32 bits | Passive performance counter value (`cycle`, `instret`, `misses`) |
+| `wb_data` | Writeback Multiplexer (4:1) | Register File `wdata`, Forwarding Distance-2 Bus | 32 bits | Final retirement result written back to destination register |
+| `rd_wb` | MEM/WB Pipeline Register | Register File Write Address (`waddr`) | 5 bits | Destination register index ($x0 - x31$) retiring in WB |
+| `reg_write` | MEM/WB Pipeline Register | Register File Write Enable (`we`) | 1 bit | Write strobe committing `wb_data` into Register File |
 
 ---
 
@@ -365,3 +632,4 @@ Target FPGA Architecture: **Xilinx Artix-7 XC7A100T-1CSG324C** (Digilent Nexys A
 | **2. Hazard resolution without software delays** | All data hazards (distance-1 and distance-2 RAW) are resolved entirely in hardware using dual 3:1 operand forwarding multiplexers, and load-use hazards trigger automatic single-cycle hardware interlocks without requiring compiler NOP insertion. |
 | **3. Demonstration of realistic workloads** | The processor execution is verified using compiled bare-metal C benchmark programs (`addition.c`, `fibonacci.c`, `sort.c`, `negative.c`, `xor.c`) with cycle-accurate terminal profiling rather than synthetic stimulus vectors. |
 | **4. Realistic timing diagram showing hazards** | A full 24-cycle timing diagram has been included that explicitly details multi-cycle divider execution, single-cycle DSP multiplication, load-use stall freezes, and 2-cycle branch flushes. |
+
