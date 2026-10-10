@@ -361,7 +361,7 @@ def print_execution_order(retired_instructions):
         print(f" {idx:<4} | CC={cc:<3} | 0x{pc:08x}   | {mnem:<28} | {rd} <= {signed_val:<5} (0x{val:08x})  | 0x{led_byte:02x} ({led_bin})")
     print("-" * 115)
 
-def print_fpga_mapping_summary(records, ret_val):
+def print_fpga_mapping_summary(records, ret_val, imem_map):
     total_cycles = len(records)
     stalls = sum(1 for r in records if r["stall"])
     forwards = sum(1 for r in records if r["fwd_a"] != 0 or r["fwd_b"] != 0)
@@ -378,6 +378,11 @@ def print_fpga_mapping_summary(records, ret_val):
         print(f" * FINAL RETURN VALUE a0 (x10)   : {ret_val} (0x{ret_val & 0xFFFFFFFF:08x})")
     print("=" * 95)
 
+    sample_rec = records[10] if len(records) > 10 else (records[0] if records else {"if_pc": 0, "if_inst": 0})
+    s_pc = sample_rec["if_pc"]
+    s_inst = sample_rec["if_inst"]
+    s_mnem = imem_map.get(s_pc, (s_inst, disassemble_word(s_inst)))[1]
+
     print("\n[5] HOW TO VIEW THESE INSTRUCTIONS ON THE PHYSICAL NEXYS A7 FPGA BOARD:")
     print("-" * 95)
     print(" 1. SPEED & CLOCK CONTROL (Slide Switches & Buttons):")
@@ -389,9 +394,9 @@ def print_fpga_mapping_summary(records, ret_val):
     print("")
     print(" 2. 8-DIGIT SEVEN-SEGMENT DISPLAY (Directly above the switches/LEDs):")
     print("    - sw[2] = 0 (Pin M13 OFF): Shows Program Counter Fetch Address (pc_if[31:0]).")
-    print("                               E.g., Cycle 10 shows '00000028' (PC of 'mul a5, a4, a5').")
+    print(f"                               E.g., Cycle 10 shows '{s_pc:08x}' (PC of '{s_mnem}').")
     print("    - sw[2] = 1 (Pin M13 ON) : Shows 32-bit Machine Instruction Code (imem_rdata[31:0]).")
-    print("                               E.g., Cycle 10 shows '02F707B3' (Machine code of 'mul a5, a4, a5').")
+    print(f"                               E.g., Cycle 10 shows '{s_inst:08X}' (Hex machine code of '{s_mnem}').")
     print("")
     print(" 3. LED HARDWARE INDICATORS:")
     print("    - LED[0] (Pin H17)       : DATA HAZARD STALL (Turns ON during load-use hazard interlocks).")
@@ -455,7 +460,7 @@ def main():
     print_execution_order(retired)
 
     # 6. Print FPGA & Performance Summary
-    print_fpga_mapping_summary(records, ret_val)
+    print_fpga_mapping_summary(records, ret_val, imem_map)
 
 if __name__ == "__main__":
     main()
