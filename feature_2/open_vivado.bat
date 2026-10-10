@@ -1,18 +1,17 @@
 @echo off
-rem ============================================================================
-rem Launcher script to open RV32M Hardware Multiplier (Feature 2) in Vivado GUI
-rem ============================================================================
-echo ==========================================================================
-echo   Launching AMD Vivado for Feature 2: Hardware Multiplier (Group 13)...
-echo ==========================================================================
+REM ============================================================================
+REM File: open_vivado.bat
+REM Description: Opens the Standalone Vivado Project for Feature 2 (RV32M Multiplier)
+REM Target Device: Xilinx Artix-7 XC7A100T-1CSG324C (Digilent Nexys A7-100T)
+REM ============================================================================
 
-cd /d "%~dp0"
+set SCRIPT_DIR=%~dp0
+set PROJ_FILE=%SCRIPT_DIR%vivado_project\rv32m_multiplier_fpga.xpr
 
-if exist "vivado_project\rv32m_multiplier.xpr" (
-    echo [*] Opening existing Vivado project: vivado_project\rv32m_multiplier.xpr
-    start vivado "vivado_project\rv32m_multiplier.xpr"
-) else (
-    echo [*] Generating Vivado project from create_vivado_project.tcl...
-    call vivado -mode batch -source create_vivado_project.tcl
-    start vivado "vivado_project\rv32m_multiplier.xpr"
+if not exist "%PROJ_FILE%" (
+    echo [*] Vivado project not found. Generating project from TCL script...
+    vivado -mode batch -source "%SCRIPT_DIR%create_vivado_project.tcl" -nojournal -nolog
 )
+
+echo [*] Launching AMD Vivado with Feature 2 FPGA Project...
+start "" vivado "%PROJ_FILE%"

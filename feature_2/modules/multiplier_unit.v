@@ -10,7 +10,7 @@
 //   - MULHU  (funct3 = 3'b011) : Unsigned x Unsigned, upper 32 bits [63:32]
 // Architecture Options:
 //   - Parameter USE_DSP = 1 (Default): Inferred onto Artix-7 DSP48E1 slices
-//   - Parameter USE_DSP = 0: Radix-4 Modified Booth Multiplier RTL
+//   - Runtime selection via use_dsp_sel (switchable on FPGA via sw[3])
 // ============================================================================
 
 `timescale 1ns/1ps
@@ -23,6 +23,7 @@ module multiplier_unit
     input  wire        clk,
     input  wire        reset_n,
     input  wire        is_mul,       // Multiplier operation enable from ID/EX
+    input  wire        use_dsp_sel,  // Runtime architecture select (1: DSP, 0: Booth)
     input  wire [2:0]  funct3,       // F3_MUL, F3_MULH, F3_MULHSU, F3_MULHU
     input  wire [31:0] op_a,         // Hazard-forwarded Operand A
     input  wire [31:0] op_b,         // Hazard-forwarded Operand B
@@ -32,11 +33,6 @@ module multiplier_unit
 
     // ------------------------------------------------------------------------
     // Signedness Decoding
-    // ------------------------------------------------------------------------
-    // MUL:    Signed A, Signed B (lower 32-bit result invariant to signedness)
-    // MULH:   Signed A, Signed B
-    // MULHSU: Signed A, Unsigned B
-    // MULHU:  Unsigned A, Unsigned B
     // ------------------------------------------------------------------------
     wire signed_a = (funct3 == 3'b011) ? 1'b0 : 1'b1;
     wire signed_b = (funct3 == 3'b010 || funct3 == 3'b011) ? 1'b0 : 1'b1;
@@ -64,8 +60,8 @@ module multiplier_unit
         .product  (product_booth)
     );
 
-    // Architecture selection based on parameter
-    assign product  = USE_DSP ? product_dsp : product_booth;
+    // Dynamic runtime or static parameter selection
+    assign product  = (use_dsp_sel) ? product_dsp : product_booth;
     assign mul_busy = 1'b0; // Single-cycle latency in EX stage
 
     // ------------------------------------------------------------------------

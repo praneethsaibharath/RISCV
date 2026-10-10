@@ -1,7 +1,7 @@
 // ============================================================================
-// File: execute_stage.v
-// Description: Execution Stage with Forwarding Muxes, ALU, & Branch Logic
-// Project: Pipelined RV32IM RISC-V Core (Feature 1: 5-Stage Upgrade)
+// File: execute_stage.v (Feature 2: Hardware Multiplier Support)
+// Description: Execution Stage with Forwarding Muxes, ALU, Multiplier, & Branch Logic
+// Project: Pipelined RV32IM RISC-V Core (Feature 2: Hardware Multiplier)
 // ============================================================================
 
 `timescale 1ns/1ps
@@ -26,6 +26,8 @@ module execute_stage (
     input  wire        mem_read_i,
     input  wire        mem_write_i,
     input  wire        immediate_sel_i,
+    input  wire        is_mul_i,
+    input  wire        use_dsp_i,
 
     // Forwarding Controls and Data
     input  wire [1:0]  forward_a_i,
@@ -40,7 +42,8 @@ module execute_stage (
     output wire        branch_or_jump_taken_o,
     output wire [31:0] target_pc_o,
     output wire [31:0] alu_in1_o,
-    output wire [31:0] alu_in2_o
+    output wire [31:0] alu_in2_o,
+    output wire        mul_active_o
 );
 
     `include "opcode.vh"
@@ -64,6 +67,7 @@ module execute_stage (
     assign alu_in1_o    = alu_in1;
     assign alu_in2_o    = alu_in2;
     assign store_data_o = forwarded_rdata2;
+    assign mul_active_o = is_mul_i;
 
     // ------------------------------------------------------------------------
     // 2. Subtractions for Branch Comparisons
@@ -95,10 +99,31 @@ module execute_stage (
     assign target_pc_o = jalr_i ? jalr_target : branch_target;
 
     // ------------------------------------------------------------------------
-    // 4. ALU Calculation
+    // 4. Hardware Multiplier Execution Unit (DSP48E1 / Booth Radix-4)
+    // ------------------------------------------------------------------------
+    wire [31:0] mul_result;
+
+    multiplier_unit #(
+        .USE_DSP(1)
+    ) u_multiplier (
+        .clk         (1'b0),
+        .reset_n     (1'b1),
+        .is_mul      (is_mul_i),
+        .use_dsp_sel (use_dsp_i),
+        .funct3      (alu_op_i),
+        .op_a        (alu_in1),
+        .op_b        (forwarded_rdata2),
+        .mul_result  (mul_result),
+        .mul_busy    ()
+    );
+
+    // ------------------------------------------------------------------------
+    // 5. Execution Result Multiplexer
     // ------------------------------------------------------------------------
     always @(*) begin
-        if (lui_i) begin
+        if (is_mul_i) begin
+            alu_result_o = mul_result;
+        end else if (lui_i) begin
             alu_result_o = imm_i;
         end else if (auipc_i) begin
             alu_result_o = pc_i + imm_i;
@@ -122,11 +147,3 @@ module execute_stage (
     end
 
 endmodule
-
-// Note: Branch evaluation logic supports signed/unsigned conditions
-
-// Note: SLT and SLTU borrow extraction verified
-
-// Note: Computes target_pc for conditional branch and JALR base+offset
-
-// Note: Integrated operand A and operand B forwarding multiplexers

@@ -1,31 +1,24 @@
 // ============================================================================
-// File: pipeline_5stage.v
-// Description: Top-Level 5-Stage Pipelined RV32I Processor Core
-// Project: Pipelined RV32IM RISC-V Core (Feature 1: 5-Stage Upgrade)
-// Stages: IF -> ID -> EX -> MEM -> WB
-// Features: Integrated Hazard Detection, Data Forwarding, Branch Resolution
+// File: pipeline_5stage.v (Feature 2: RV32IM Multiplier Integrated Core)
+// Description: Fully Pipelined 5-Stage RV32IM Processor Core with Hardware Multiplier
+// Project: Pipelined RV32IMF RISC-V Core (Feature 2: Hardware Multiplier)
 // ============================================================================
 
 `timescale 1ns/1ps
 
-module pipeline_5stage
-#(
-    parameter [31:0] RESET_PC = 32'h0000_0000
-)
-(
+module pipeline_5stage #(
+    parameter RESET_PC = 32'h0000_0000
+)(
     input  wire        clk,
-    input  wire        reset_n,       // Active-low asynchronous/synchronous reset
-    input  wire        stall_ext,     // External stall input (e.g. cache miss, multi-cycle stall)
+    input  wire        reset_n,
+    input  wire        stall_ext,
+    input  wire        use_dsp_i,
 
-    // ------------------------------------------------------------------------
-    // Instruction Memory (IMEM) Interface - IF Stage
-    // ------------------------------------------------------------------------
+    // Instruction Memory Bus
     output wire [31:0] imem_addr,
     input  wire [31:0] imem_rdata,
 
-    // ------------------------------------------------------------------------
-    // Data Memory (DMEM) Interface - MEM Stage
-    // ------------------------------------------------------------------------
+    // Data Memory Bus
     output wire [31:0] dmem_addr,
     output wire [31:0] dmem_wdata,
     output wire [3:0]  dmem_wstrb,
@@ -33,87 +26,84 @@ module pipeline_5stage
     output wire        dmem_re,
     input  wire [31:0] dmem_rdata,
 
-    // ------------------------------------------------------------------------
-    // Diagnostic / Monitoring Outputs
-    // ------------------------------------------------------------------------
+    // Pipeline Diagnostics and Real-Time Observation
     output wire [31:0] pc_if,
     output wire [31:0] pc_id,
     output wire [31:0] pc_ex,
     output wire [31:0] pc_mem,
     output wire [31:0] pc_wb,
 
+    // Commit / Writeback Status
     output wire        wb_reg_write,
     output wire [4:0]  wb_dest_reg,
     output wire [31:0] wb_data,
 
+    // Hazard Status Diagnostics
     output wire        hazard_stall,
     output wire        hazard_flush_id,
     output wire        hazard_flush_ex,
     output wire [1:0]  forward_a,
     output wire [1:0]  forward_b,
+    output wire        mul_active,
     output wire        exception
 );
 
-    `include "opcode.vh"
+    // ========================================================================
+    // Hazard and Branch Control Wires
+    // ========================================================================
+    wire        stall_if;
+    wire        stall_if_id;
+    wire        flush_if_id;
+    wire        flush_id_ex;
 
-    // ========================================================================
-    // 1. IF Stage (Instruction Fetch)
-    // ========================================================================
-    reg  [31:0] pc;
-    wire [31:0] pc_plus4 = pc + 32'd4;
-    wire [31:0] target_pc;
     wire        branch_or_jump_taken;
+    wire [31:0] target_pc;
 
-    // Hazard control wires
-    wire stall_if;
-    wire stall_if_id;
-    wire flush_if_id;
-    wire flush_id_ex;
+    // ========================================================================
+    // 1. IF Stage (Instruction Fetch & PC Update)
+    // ========================================================================
+    reg  [31:0] pc_reg;
+    wire [31:0] pc_next;
+    wire [31:0] pc_plus4;
 
-    wire total_stall_if    = stall_if || stall_ext;
-    wire total_stall_if_id = stall_if_id || stall_ext;
+    assign pc_plus4 = pc_reg + 32'd4;
+    assign pc_next  = branch_or_jump_taken ? target_pc : pc_plus4;
 
     always @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            pc <= RESET_PC;
-        end else if (branch_or_jump_taken) begin
-            // Redirect on branch / jump taken in EX
-            pc <= target_pc;
-        end else if (!total_stall_if) begin
-            // Sequential increment
-            pc <= pc_plus4;
+            pc_reg <= RESET_PC;
+        end else if (!stall_if && !stall_ext) begin
+            pc_reg <= pc_next;
         end
     end
 
-    assign imem_addr = pc;
-    assign pc_if     = pc;
+    assign imem_addr = pc_reg;
+    assign pc_if     = pc_reg;
 
     // ========================================================================
     // IF/ID Pipeline Register
     // ========================================================================
     wire [31:0] if_id_pc;
     wire [31:0] if_id_pc_plus4;
-    wire [31:0] if_id_instr;
+    wire [31:0] if_id_inst;
 
-    if_id_reg #(
-        .RESET_PC(RESET_PC)
-    ) u_if_id_reg (
+    if_id_reg u_if_id_reg (
         .clk        (clk),
         .reset_n    (reset_n),
-        .stall      (total_stall_if_id),
-        .flush      (flush_if_id),
-        .pc_i       (pc),
+        .stall      (stall_if_id || stall_ext),
+        .flush      (flush_if_id || branch_or_jump_taken),
+        .pc_i       (pc_reg),
         .pc_plus4_i (pc_plus4),
         .instr_i    (imem_rdata),
         .pc_o       (if_id_pc),
         .pc_plus4_o (if_id_pc_plus4),
-        .instr_o    (if_id_instr)
+        .instr_o    (if_id_inst)
     );
 
     assign pc_id = if_id_pc;
 
     // ========================================================================
-    // 2. ID Stage (Instruction Decode & Register File Read)
+    // 2. ID Stage (Decode, Register File, & Hazard Source Signals)
     // ========================================================================
     wire [2:0]  id_alu_op;
     wire        id_arithsubtype;
@@ -128,6 +118,7 @@ module pipeline_5stage
     wire        id_mem_to_reg;
     wire        id_reg_write;
     wire        id_immediate_sel;
+    wire        id_is_mul;
     wire        id_illegal_inst;
     wire [31:0] id_rdata1;
     wire [31:0] id_rdata2;
@@ -140,36 +131,37 @@ module pipeline_5stage
     wire        id_rs2_used;
 
     decode_stage u_decode_stage (
-        .clk             (clk),
-        .reset_n         (reset_n),
-        .instruction_i   (if_id_instr),
-        .pc_i            (if_id_pc),
-        .wb_reg_write_i  (wb_reg_write),
-        .wb_dest_reg_i   (wb_dest_reg),
-        .wb_data_i       (wb_data),
-        .alu_op_o        (id_alu_op),
-        .arithsubtype_o  (id_arithsubtype),
-        .alu_o           (id_alu),
-        .lui_o           (id_lui),
-        .auipc_o         (id_auipc),
-        .jal_o           (id_jal),
-        .jalr_o          (id_jalr),
-        .branch_o        (id_branch),
-        .mem_read_o      (id_mem_read),
-        .mem_write_o     (id_mem_write),
-        .mem_to_reg_o    (id_mem_to_reg),
-        .reg_write_o     (id_reg_write),
-        .immediate_sel_o (id_immediate_sel),
-        .illegal_inst_o  (id_illegal_inst),
-        .rdata1_o        (id_rdata1),
-        .rdata2_o        (id_rdata2),
-        .imm_o           (id_imm),
-        .rs1_o           (id_rs1),
-        .rs2_o           (id_rs2),
-        .rd_o            (id_rd),
-        .funct3_o        (id_funct3),
-        .id_rs1_used_o   (id_rs1_used),
-        .id_rs2_used_o   (id_rs2_used)
+        .clk            (clk),
+        .reset_n        (reset_n),
+        .instruction_i  (if_id_inst),
+        .pc_i           (if_id_pc),
+        .wb_reg_write_i (wb_reg_write),
+        .wb_dest_reg_i  (wb_dest_reg),
+        .wb_data_i      (wb_data),
+        .alu_op_o       (id_alu_op),
+        .arithsubtype_o (id_arithsubtype),
+        .alu_o          (id_alu),
+        .lui_o          (id_lui),
+        .auipc_o        (id_auipc),
+        .jal_o          (id_jal),
+        .jalr_o         (id_jalr),
+        .branch_o       (id_branch),
+        .mem_read_o     (id_mem_read),
+        .mem_write_o    (id_mem_write),
+        .mem_to_reg_o   (id_mem_to_reg),
+        .reg_write_o    (id_reg_write),
+        .immediate_sel_o(id_immediate_sel),
+        .is_mul_o       (id_is_mul),
+        .illegal_inst_o (id_illegal_inst),
+        .rdata1_o       (id_rdata1),
+        .rdata2_o       (id_rdata2),
+        .imm_o          (id_imm),
+        .rs1_o          (id_rs1),
+        .rs2_o          (id_rs2),
+        .rd_o           (id_rd),
+        .funct3_o       (id_funct3),
+        .id_rs1_used_o  (id_rs1_used),
+        .id_rs2_used_o  (id_rs2_used)
     );
 
     // ========================================================================
@@ -188,6 +180,7 @@ module pipeline_5stage
     wire        id_ex_mem_to_reg;
     wire        id_ex_reg_write;
     wire        id_ex_immediate_sel;
+    wire        id_ex_is_mul;
     wire        id_ex_illegal_inst;
     wire [31:0] id_ex_pc;
     wire [31:0] id_ex_pc_plus4;
@@ -203,7 +196,7 @@ module pipeline_5stage
         .clk             (clk),
         .reset_n         (reset_n),
         .stall           (stall_ext),
-        .flush           (flush_id_ex),
+        .flush           (flush_id_ex || branch_or_jump_taken),
         .alu_op_i        (id_alu_op),
         .arithsubtype_i  (id_arithsubtype),
         .alu_i           (id_alu),
@@ -217,6 +210,7 @@ module pipeline_5stage
         .mem_to_reg_i    (id_mem_to_reg),
         .reg_write_i     (id_reg_write),
         .immediate_sel_i (id_immediate_sel),
+        .is_mul_i        (id_is_mul),
         .illegal_inst_i  (id_illegal_inst),
         .pc_i            (if_id_pc),
         .pc_plus4_i      (if_id_pc_plus4),
@@ -240,6 +234,7 @@ module pipeline_5stage
         .mem_to_reg_o    (id_ex_mem_to_reg),
         .reg_write_o     (id_ex_reg_write),
         .immediate_sel_o (id_ex_immediate_sel),
+        .is_mul_o        (id_ex_is_mul),
         .illegal_inst_o  (id_ex_illegal_inst),
         .pc_o            (id_ex_pc),
         .pc_plus4_o      (id_ex_pc_plus4),
@@ -255,7 +250,7 @@ module pipeline_5stage
     assign pc_ex = id_ex_pc;
 
     // ========================================================================
-    // 3. EX Stage (Execution, ALU, & Branch Evaluation)
+    // 3. EX Stage (Execution, ALU, Multiplier, & Branch Evaluation)
     // ========================================================================
     wire [31:0] ex_alu_result;
     wire [31:0] ex_store_data;
@@ -282,6 +277,8 @@ module pipeline_5stage
         .mem_read_i            (id_ex_mem_read),
         .mem_write_i           (id_ex_mem_write),
         .immediate_sel_i       (id_ex_immediate_sel),
+        .is_mul_i              (id_ex_is_mul),
+        .use_dsp_i             (use_dsp_i),
         .forward_a_i           (forward_a),
         .forward_b_i           (forward_b),
         .ex_mem_alu_result_i   (ex_mem_alu_result),
@@ -292,7 +289,8 @@ module pipeline_5stage
         .branch_or_jump_taken_o(branch_or_jump_taken),
         .target_pc_o           (target_pc),
         .alu_in1_o             (ex_alu_in1),
-        .alu_in2_o             (ex_alu_in2)
+        .alu_in2_o             (ex_alu_in2),
+        .mul_active_o          (mul_active)
     );
 
     // ========================================================================
@@ -440,7 +438,3 @@ module pipeline_5stage
     assign exception       = id_illegal_inst;
 
 endmodule
-
-// Note: Integrated total_stall_if and flush_id_ex across stages
-
-// Note: Verified PC update on branch_or_jump_taken and sequential fetch

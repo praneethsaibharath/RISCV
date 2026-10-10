@@ -7,9 +7,6 @@
 ../modules/execute_stage.v
 ../modules/memory_stage.v
 ../modules/writeback_stage.v
-../modules/multiplier_dsp.v
-../modules/booth_radix4_multiplier.v
-../modules/multiplier_unit.v
 ../modules/pipeline_5stage.v
 ../modules/pipe.v
 ../modules/memory.v

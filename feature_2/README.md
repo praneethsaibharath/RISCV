@@ -127,13 +127,39 @@ python run_pipeline_trace.py --asm "li x1, 50; li x2, -4; mul x3, x1, x2; mv a0,
 
 ---
 
-## 6. Opening in AMD Vivado GUI
+## 6. Standalone FPGA Implementation & Board Mapping (Digilent Nexys A7-100T)
 
-To open or synthesize the Feature 2 project in AMD Vivado:
-1. Double-click or run [`feature_2/open_vivado.bat`](open_vivado.bat).
-2. Or batch-generate the project:
-   ```powershell
-   cd feature_2
-   vivado -mode batch -source create_vivado_project.tcl
-   ```
-3. Direct Project File: [`feature_2/vivado_project/rv32m_multiplier.xpr`](vivado_project/rv32m_multiplier.xpr).
+Feature 2 has its own standalone FPGA top-level wrapper ([`feature_2/modules/fpga_top_feature2.v`](modules/fpga_top_feature2.v)) and pin constraints ([`feature_2/constraints/nexys_a7_100t.xdc`](constraints/nexys_a7_100t.xdc)) mapped for the Xilinx Artix-7 XC7A100T FPGA.
+
+### Board Peripherals & Visual Feedback
+
+| Peripheral | Board Location | Core Signal Connected | Hardware Behavior & Visual Indication |
+|---|---|---|---|
+| **8-Digit 7-Segment Display** | Located directly **ABOVE the 16 LEDs** | `imem_addr` / `imem_rdata` | **Dual Display Mode:**<br>• `sw[2]=0`: Shows Fetch PC Address (e.g. `00000028` for `mul`).<br>• `sw[2]=1`: Shows 32-bit Machine Code (e.g. `02F707B3` for `mul a5, a4, a5`). |
+| **Switch `sw[3]`** | Slide Switch 3 (Pin `R15`) | Multiplier Engine Select | • `0` = **Xilinx Artix-7 DSP48E1 Slices** (High-speed single-cycle DSP multiplication).<br>• `1` = **Radix-4 Modified Booth Multiplier RTL**. |
+| **Switch `sw[2]`** | Slide Switch 2 (Pin `M13`) | 7-Seg Display Select | • `0` = Shows **Fetch PC Address** (`pc_if[31:0]`).<br>• `1` = Shows **32-bit Machine Instruction Code** (`imem_rdata[31:0]`). |
+| **Switch `sw[1]`** | Slide Switch 1 (Pin `L16`) | Clock Speed Select | • `0` = 100 MHz oscillator.<br>• `1` = **1 Hz Slow Clock mode** for live visual tracking (1 instruction/cycle per second). |
+| **Switch `sw[0]`** | Slide Switch 0 (Pin `J15`) | Step Clock Mode | • `0` = Continuous execution.<br>• `1` = **Manual Single-Step Mode** via Center Pushbutton (`btnc`). |
+| **Button `btnc`** | Center Pushbutton (Pin `N17`)| Manual Step Advance | In step mode (`sw[0]=1`), advances pipeline by exactly 1 clock cycle per press. |
+| **Button `reset`**| CPU Reset (Pin `C12`, red) | `cpu_resetn` | Active-low master synchronous reset. Restarts execution from `PC=0x00`. |
+| **LED[0]** | Discrete LED 0 (Pin `H17`) | `hazard_stall` | **DATA HAZARD LED:** Turns ON when a load-use stall occurs before multiplication. |
+| **LED[1]** | Discrete LED 1 (Pin `K15`) | `fwd_active` | **DATA FORWARDING LED:** Turns ON when operand bypasses directly into multiplier. |
+| **LED[2]** | Discrete LED 2 (Pin `J13`) | `hazard_flush_id` | **BRANCH FLUSH LED:** Turns ON when branch or jump flushes the pipeline. |
+| **LED[3]** | Discrete LED 3 (Pin `N14`) | `wb_reg_write` | **RETIREMENT LED:** Turns ON when multiplication result commits to register file. |
+| **LED[4]** | Discrete LED 4 (Pin `R18`) | `mul_active` | **MULTIPLIER ACTIVE LED:** Lights up whenever an RV32M instruction executes in EX stage. |
+| **LED[5]** | Discrete LED 5 (Pin `V17`) | `use_dsp_mode` | **DSP MODE LED:** Lights up when using DSP48E1 slices (`sw[3]=0`); turns OFF for Booth RTL (`sw[3]=1`). |
+| **LED[15:8]** | Discrete LEDs 15:8 | `wb_data[7:0]` | Displays low byte of committed multiplication result (e.g. $25 \times 16 = 400 = \text{0x190} \implies \text{0x90} = \mathbf{1001\_0000_2}$). |
+
+---
+
+## 7. Opening in AMD Vivado GUI
+
+The standalone Vivado project is pre-configured and ready to synthesize:
+1. **One-Click Launch:**
+   - Double-click or run [`feature_2/open_vivado.bat`](open_vivado.bat).
+2. **Direct Project File:**
+   - Open [`feature_2/vivado_project/rv32m_multiplier_fpga.xpr`](vivado_project/rv32m_multiplier_fpga.xpr).
+3. **Synthesis & Bitstream:**
+   - Synthesizes with **0 Errors, 0 Critical Warnings**.
+   - Generates bitstream `fpga_top_feature2.bit` for direct programming onto the Nexys A7 FPGA board.
+
