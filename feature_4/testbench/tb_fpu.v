@@ -13,7 +13,12 @@
 //       * Subtraction: 5.0 - 3.0 = 2.0, 7.5 - 2.5 = 5.0, 4.0 - 4.0 = 0.0
 //       * Multiplication: 4.0 * 2.0 = 8.0, 12.25 * 4.0 = 49.0, (-3.5) * 2.0 = -7.0, 0.0 * 8.0 = 0.0
 //       * Division: 10.0 / 2.0 = 5.0, 100.0 / 8.0 = 12.5, 1.0 / 3.0 = 0.33333334
-//       * Divide-by-Zero: 4.0 / 0.0 = +Infinity (32'h7F800000)
+//   - IEEE 754 Special Cases (NaN, Infinity, Divide-by-Zero, Zero-times-Inf):
+//       * FADD (+Inf + -Inf) = qNaN, FADD (NaN + 1.0) = qNaN, FADD (+Inf + 1.0) = +Inf
+//       * FSUB (+Inf - +Inf) = qNaN, FSUB (1.0 - +Inf) = -Inf
+//       * FMUL (0.0 * Inf) = qNaN, FMUL (NaN * 2.0) = qNaN, FMUL (+Inf * -2.0) = -Inf
+//       * FDIV (0.0 / 0.0) = qNaN, FDIV (Inf / Inf) = qNaN, FDIV (-2.0 / 0.0) = -Inf
+//       * FDIV (2.0 / +Inf) = +0.0, FDIV (-2.0 / +Inf) = -0.0
 //   - Interlock Handshake:
 //       * fpu_busy holds pipeline during calculation
 //       * fpu_done pulses on the completion cycle
@@ -68,7 +73,7 @@ module tb_fpu;
         input [31:0]  b;
         input [31:0]  expected;
         input integer expected_cycles;
-        input [127:0] test_name;
+        input [160:0] test_name;
         integer elapsed_cycles;
         begin
             @(posedge clk);
@@ -95,11 +100,11 @@ module tb_fpu;
             // Now in S_DONE: fpu_busy has dropped, fpu_done is high, result is valid
             test_count = test_count + 1;
             if (fpu_result === expected && elapsed_cycles === expected_cycles) begin
-                $display("[PASS] %-22s | Result=0x%08h (Exp=0x%08h) | Latency=%2d cyc (Exp=%2d)",
+                $display("[PASS] %-28s | Result=0x%08h (Exp=0x%08h) | Latency=%2d cyc (Exp=%2d)",
                          test_name, fpu_result, expected, elapsed_cycles, expected_cycles);
                 pass_count = pass_count + 1;
             end else begin
-                $display("[FAIL] %-22s | Result=0x%08h (Exp=0x%08h) | Latency=%2d cyc (Exp=%2d)",
+                $display("[FAIL] %-28s | Result=0x%08h (Exp=0x%08h) | Latency=%2d cyc (Exp=%2d)",
                          test_name, fpu_result, expected, elapsed_cycles, expected_cycles);
                 fail_count = fail_count + 1;
             end
@@ -146,6 +151,12 @@ module tb_fpu;
         test_fpu_vector(7'b0000000, 3'b000, 32'hC1200000, 32'h40200000, 32'hC0F00000, 5, "FADD -10.0 + 2.5");
         // 0.0 + 5.0 = 5.0
         test_fpu_vector(7'b0000000, 3'b000, 32'h00000000, 32'h40A00000, 32'h40A00000, 5, "FADD 0.0 + 5.0");
+        // +Inf + 1.0 = +Inf
+        test_fpu_vector(7'b0000000, 3'b000, 32'h7F800000, 32'h3F800000, 32'h7F800000, 5, "FADD +Inf + 1.0");
+        // +Inf + -Inf = qNaN (Invalid operation)
+        test_fpu_vector(7'b0000000, 3'b000, 32'h7F800000, 32'hFF800000, 32'h7FC00000, 5, "FADD +Inf + -Inf (qNaN)");
+        // NaN + 1.0 = qNaN
+        test_fpu_vector(7'b0000000, 3'b000, 32'h7FC00000, 32'h3F800000, 32'h7FC00000, 5, "FADD NaN + 1.0 (qNaN)");
 
         // --------------------------------------------------------------------
         // 2. FSUB.S Tests (Target: Exactly 5 clock cycles)
@@ -157,6 +168,10 @@ module tb_fpu;
         test_fpu_vector(7'b0000100, 3'b000, 32'h40F00000, 32'h40200000, 32'h40A00000, 5, "FSUB 7.5 - 2.5");
         // 4.0 - 4.0 = 0.0
         test_fpu_vector(7'b0000100, 3'b000, 32'h40800000, 32'h40800000, 32'h00000000, 5, "FSUB 4.0 - 4.0");
+        // +Inf - +Inf = qNaN (Invalid operation)
+        test_fpu_vector(7'b0000100, 3'b000, 32'h7F800000, 32'h7F800000, 32'h7FC00000, 5, "FSUB +Inf - +Inf (qNaN)");
+        // 1.0 - +Inf = -Inf
+        test_fpu_vector(7'b0000100, 3'b000, 32'h3F800000, 32'h7F800000, 32'hFF800000, 5, "FSUB 1.0 - +Inf (-Inf)");
 
         // --------------------------------------------------------------------
         // 3. FMUL.S Tests (Target: Exactly 4 clock cycles)
@@ -170,6 +185,14 @@ module tb_fpu;
         test_fpu_vector(7'b0001000, 3'b000, 32'hC0600000, 32'h40000000, 32'hC0E00000, 4, "FMUL -3.5 * 2.0");
         // 0.0 * 8.0 = 0.0
         test_fpu_vector(7'b0001000, 3'b000, 32'h00000000, 32'h41000000, 32'h00000000, 4, "FMUL 0.0 * 8.0");
+        // 0.0 * +Inf = qNaN (Invalid operation)
+        test_fpu_vector(7'b0001000, 3'b000, 32'h00000000, 32'h7F800000, 32'h7FC00000, 4, "FMUL 0.0 * +Inf (qNaN)");
+        // +Inf * 0.0 = qNaN (Invalid operation)
+        test_fpu_vector(7'b0001000, 3'b000, 32'h7F800000, 32'h00000000, 32'h7FC00000, 4, "FMUL +Inf * 0.0 (qNaN)");
+        // +Inf * -2.0 = -Inf
+        test_fpu_vector(7'b0001000, 3'b000, 32'h7F800000, 32'hC0000000, 32'hFF800000, 4, "FMUL +Inf * -2.0 (-Inf)");
+        // NaN * 2.0 = qNaN
+        test_fpu_vector(7'b0001000, 3'b000, 32'h7FC00000, 32'h40000000, 32'h7FC00000, 4, "FMUL NaN * 2.0 (qNaN)");
 
         // --------------------------------------------------------------------
         // 4. FDIV.S Tests (Target: Exactly 15 clock cycles)
@@ -182,7 +205,19 @@ module tb_fpu;
         // 1.0 / 3.0 = 0.33333334 (0x3EAAAAAB)
         test_fpu_vector(7'b0001100, 3'b000, 32'h3F800000, 32'h40400000, 32'h3EAAAAAB, 15, "FDIV 1.0 / 3.0");
         // 4.0 / 0.0 = +Infinity (0x7F800000)
-        test_fpu_vector(7'b0001100, 3'b000, 32'h40800000, 32'h00000000, 32'h7F800000, 15, "FDIV 4.0 / 0.0 (Div0)");
+        test_fpu_vector(7'b0001100, 3'b000, 32'h40800000, 32'h00000000, 32'h7F800000, 15, "FDIV 4.0 / 0.0 (+Inf)");
+        // -2.0 / 0.0 = -Infinity (0xFF800000)
+        test_fpu_vector(7'b0001100, 3'b000, 32'hC0000000, 32'h00000000, 32'hFF800000, 15, "FDIV -2.0 / 0.0 (-Inf)");
+        // 0.0 / 0.0 = qNaN (0x7FC00000)
+        test_fpu_vector(7'b0001100, 3'b000, 32'h00000000, 32'h00000000, 32'h7FC00000, 15, "FDIV 0.0 / 0.0 (qNaN)");
+        // +Inf / +Inf = qNaN (0x7FC00000)
+        test_fpu_vector(7'b0001100, 3'b000, 32'h7F800000, 32'h7F800000, 32'h7FC00000, 15, "FDIV +Inf / +Inf (qNaN)");
+        // 2.0 / +Inf = +0.0
+        test_fpu_vector(7'b0001100, 3'b000, 32'h40000000, 32'h7F800000, 32'h00000000, 15, "FDIV 2.0 / +Inf (+0.0)");
+        // -2.0 / +Inf = -0.0 (0x80000000)
+        test_fpu_vector(7'b0001100, 3'b000, 32'hC0000000, 32'h7F800000, 32'h80000000, 15, "FDIV -2.0 / +Inf (-0.0)");
+        // NaN / 2.0 = qNaN
+        test_fpu_vector(7'b0001100, 3'b000, 32'h7FC00000, 32'h40000000, 32'h7FC00000, 15, "FDIV NaN / 2.0 (qNaN)");
 
         $display("\n============================================================================");
         $display("                   TB_FPU SUMMARY RESULTS                                   ");
@@ -191,7 +226,7 @@ module tb_fpu;
         $display(" Vectors Passed    : %0d", pass_count);
         $display(" Vectors Failed    : %0d", fail_count);
         if (fail_count == 0) begin
-            $display(" STATUS: ALL FPU UNIT TESTS PASSED WITH 100%% CYCLE COMPLIANCE!");
+            $display(" STATUS: ALL FPU UNIT TESTS PASSED WITH 100%% CYCLE & IEEE-754 COMPLIANCE!");
         end else begin
             $display(" STATUS: FAILED!");
         end

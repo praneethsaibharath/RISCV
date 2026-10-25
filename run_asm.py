@@ -59,6 +59,9 @@ def deploy_hex(src_imem, src_dmem, src_dis=None, src_elf=None):
     """
     targets = [
         os.path.join(ROOT_DIR, "feature_4", "mem"),
+        os.path.join(ROOT_DIR, "feature_4", "vivado_project"),
+        os.path.join(ROOT_DIR, "feature_4", "vivado_project", "rv32mf_fpu_fpga.runs", "synth_1"),
+        os.path.join(ROOT_DIR, "feature_4", "simulation"),
         os.path.join(ROOT_DIR, "feature_1", "mem"),
         os.path.join(ROOT_DIR, "feature_2", "mem"),
         os.path.join(ROOT_DIR, "feature_3", "mem"),
@@ -95,10 +98,20 @@ def run_simulation():
         "modules/hazard_unit.v", "testbench/tb_fpu_c_test.v"
     ]
     try:
-        print("[*] Running hardware pipeline simulation...")
-        subprocess.check_call(iverilog_cmd, cwd=f4_dir)
-        subprocess.check_call([sim_bin], cwd=f4_dir)
-        os.remove(sim_bin)
+        if shutil.which("iverilog"):
+            print("[*] Running hardware pipeline simulation with iverilog...")
+            subprocess.check_call(iverilog_cmd, cwd=f4_dir)
+            subprocess.check_call([sim_bin], cwd=f4_dir)
+            if os.path.exists(sim_bin):
+                os.remove(sim_bin)
+        else:
+            vivado_bin = r"C:\AMDDesignTools\2025.2\Vivado\bin"
+            os.environ["PATH"] = vivado_bin + os.pathsep + os.environ.get("PATH", "")
+            sim_dir = os.path.join(f4_dir, "simulation")
+            print("[*] Running hardware pipeline simulation with Vivado xsim...")
+            subprocess.check_call(["xvlog.bat", "-i", "../modules", "../testbench/tb_fpu_c_test.v"], cwd=sim_dir, shell=True)
+            subprocess.check_call(["xelab.bat", "-top", "tb_fpu_c_test", "-snapshot", "snap_tb_c_test", "-debug", "typical"], cwd=sim_dir, shell=True)
+            subprocess.check_call(["xsim.bat", "snap_tb_c_test", "-R"], cwd=sim_dir, shell=True)
     except Exception as e:
         print(f"Simulation notice: {e}")
 

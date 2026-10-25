@@ -58,6 +58,8 @@ module fpu_single_core (
     reg        fadd_sticky_round;
     reg [31:0] fadd_final_res;
     reg        fadd_is_zero_res;
+    reg        fadd_nan;
+    reg        fadd_inf;
 
     // ------------------------------------------------------------------------
     // FMUL Pipeline Registers
@@ -67,6 +69,8 @@ module fpu_single_core (
     reg [23:0] fmul_mant_a, fmul_mant_b;
     reg [47:0] fmul_prod;
     reg        fmul_zero_res;
+    reg        fmul_nan;
+    reg        fmul_inf;
     reg [31:0] fmul_final_res;
 
     // ------------------------------------------------------------------------
@@ -86,13 +90,17 @@ module fpu_single_core (
     wire sign_a = op_a[31];
     wire [7:0] exp_a = op_a[30:23];
     wire [22:0] frac_a = op_a[22:0];
-    wire a_is_zero = (op_a[30:0] == 31'd0);
+    wire a_is_zero = (exp_a == 8'd0);
+    wire a_is_nan  = (exp_a == 8'hFF) && (frac_a != 23'd0);
+    wire a_is_inf  = (exp_a == 8'hFF) && (frac_a == 23'd0);
 
     wire is_sub_op = (funct7 == FUNCT7_FSUB);
     wire sign_b = op_b[31] ^ is_sub_op;
     wire [7:0] exp_b = op_b[30:23];
     wire [22:0] frac_b = op_b[22:0];
-    wire b_is_zero = (op_b[30:0] == 31'd0);
+    wire b_is_zero = (exp_b == 8'd0);
+    wire b_is_nan  = (exp_b == 8'hFF) && (frac_b != 23'd0);
+    wire b_is_inf  = (exp_b == 8'hFF) && (frac_b == 23'd0);
 
     wire [23:0] mant_a = a_is_zero ? 24'd0 : {1'b1, frac_a};
     wire [23:0] mant_b = b_is_zero ? 24'd0 : {1'b1, frac_b};
@@ -104,6 +112,19 @@ module fpu_single_core (
     wire [23:0] m_small_in = a_greater ? mant_b : mant_a;
     wire sign_large_in     = a_greater ? sign_a : sign_b;
     wire sign_small_in     = a_greater ? sign_b : sign_a;
+
+    // Special Case Combinational Classifiers
+    wire fadd_nan_comb     = a_is_nan || b_is_nan || (a_is_inf && b_is_inf && (sign_large_in ^ sign_small_in));
+    wire fadd_inf_comb     = (a_is_inf || b_is_inf) && !fadd_nan_comb;
+    wire fadd_zero_comb    = a_is_zero && b_is_zero;
+
+    wire fmul_nan_comb     = a_is_nan || b_is_nan || (a_is_zero && b_is_inf) || (b_is_zero && a_is_inf);
+    wire fmul_inf_comb     = (a_is_inf || b_is_inf) && !fmul_nan_comb;
+    wire fmul_zero_comb    = (a_is_zero || b_is_zero) && !fmul_nan_comb;
+
+    wire fdiv_nan_comb     = a_is_nan || b_is_nan || (a_is_zero && b_is_zero) || (a_is_inf && b_is_inf);
+    wire fdiv_inf_comb     = (b_is_zero || a_is_inf) && !fdiv_nan_comb;
+    wire fdiv_zero_comb    = (a_is_zero || b_is_inf) && !fdiv_nan_comb;
 
     // Small mantissa alignment shifter (27 bits: mantissa + 3 guard bits)
     wire [26:0] small_ext = {m_small_in, 3'b000};
@@ -172,6 +193,8 @@ module fpu_single_core (
             fadd_sticky_round     <= 1'b0;
             fadd_final_res        <= 32'd0;
             fadd_is_zero_res      <= 1'b0;
+            fadd_nan              <= 1'b0;
+            fadd_inf              <= 1'b0;
 
             // FMUL
             fmul_sign_res         <= 1'b0;
@@ -180,6 +203,8 @@ module fpu_single_core (
             fmul_mant_b           <= 24'd0;
             fmul_prod             <= 48'd0;
             fmul_zero_res         <= 1'b0;
+            fmul_nan              <= 1'b0;
+            fmul_inf              <= 1'b0;
             fmul_final_res        <= 32'd0;
 
             // FDIV
@@ -209,7 +234,9 @@ module fpu_single_core (
                                 fmul_raw_exp  <= {2'b00, exp_a} + {2'b00, exp_b} - 10'd127;
                                 fmul_mant_a   <= mant_a;
                                 fmul_mant_b   <= mant_b;
-                                fmul_zero_res <= a_is_zero || b_is_zero;
+                                fmul_nan      <= fmul_nan_comb;
+                                fmul_inf      <= fmul_inf_comb;
+                                fmul_zero_res <= fmul_zero_comb;
                                 state         <= S_CALC;
                             end
 
@@ -221,9 +248,9 @@ module fpu_single_core (
                                 fdiv_sign_res <= op_a[31] ^ op_b[31];
                                 fdiv_denom    <= mant_b;
                                 fdiv_quot     <= 26'd0;
-                                fdiv_div0     <= b_is_zero && !a_is_zero;
-                                fdiv_nan      <= b_is_zero && a_is_zero;
-                                fdiv_zero_res <= a_is_zero && !b_is_zero;
+                                fdiv_nan      <= fdiv_nan_comb;
+                                fdiv_div0     <= fdiv_inf_comb;
+                                fdiv_zero_res <= fdiv_zero_comb;
 
                                 if (mant_a >= mant_b) begin
                                     fdiv_rem     <= {2'b00, mant_a};
@@ -245,7 +272,9 @@ module fpu_single_core (
                                 fadd_m_large_ext     <= m_large_aligned;
                                 fadd_m_small_aligned <= m_small_aligned;
                                 fadd_eff_sub         <= sign_large_in ^ sign_small_in;
-                                fadd_is_zero_res     <= a_is_zero && b_is_zero;
+                                fadd_nan             <= fadd_nan_comb;
+                                fadd_inf             <= fadd_inf_comb;
+                                fadd_is_zero_res     <= fadd_zero_comb;
                                 state                <= S_CALC;
                             end
                         endcase
@@ -292,7 +321,11 @@ module fpu_single_core (
                                     fmul_final_e    = fmul_norm_e;
                                 end
 
-                                if (fmul_zero_res || $signed(fmul_final_e) <= 0) begin
+                                if (fmul_nan) begin
+                                    fmul_final_res <= 32'h7FC0_0000;
+                                end else if (fmul_inf) begin
+                                    fmul_final_res <= {fmul_sign_res, 8'hFF, 23'd0};
+                                end else if (fmul_zero_res || $signed(fmul_final_e) <= 0) begin
                                     fmul_final_res <= {fmul_sign_res, 31'd0};
                                 end else if ($signed(fmul_final_e) >= 255) begin
                                     fmul_final_res <= {fmul_sign_res, 8'hFF, 23'd0};
@@ -394,7 +427,7 @@ module fpu_single_core (
                                     fadd_sticky_round <= fadd_sum[0];
                                 end else begin
                                     fadd_lz = clz27(fadd_sum[26:0]);
-                                    if (fadd_lz >= fadd_exp_large[4:0] && fadd_exp_large <= 9'd27) begin
+                                    if ({4'd0, fadd_lz} >= fadd_exp_large) begin
                                         fadd_norm_m       <= (fadd_sum[26:0] << (fadd_exp_large > 0 ? (fadd_exp_large - 1) : 0));
                                         fadd_norm_e       <= 9'd0;
                                         fadd_sticky_round <= 1'b0;
@@ -426,7 +459,11 @@ module fpu_single_core (
                                     fadd_final_e    = fadd_norm_e;
                                 end
 
-                                if (fadd_is_zero_res || fadd_sum == 29'd0 || $signed(fadd_final_e) <= 0) begin
+                                if (fadd_nan) begin
+                                    fadd_final_res <= 32'h7FC0_0000;
+                                end else if (fadd_inf) begin
+                                    fadd_final_res <= {fadd_sign_large, 8'hFF, 23'd0};
+                                end else if (fadd_is_zero_res || fadd_sum == 29'd0 || $signed(fadd_final_e) <= 0) begin
                                     fadd_final_res <= 32'h0000_0000;
                                 end else if ($signed(fadd_final_e) >= 255) begin
                                     fadd_final_res <= {fadd_sign_large, 8'hFF, 23'd0};

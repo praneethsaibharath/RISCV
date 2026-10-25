@@ -82,4 +82,7 @@ main:
     li      x24, 0xCAFEFEED
     sw      x24, 44(x23)        # RAM[0x22C] = 0xCAFEFEED
 
+    # Return Feature 4 completion signature (0x44 = 68) in a0 (x10) so FPGA LEDs[15:8] display 0x44 on halt
+    li      x10, 0x44
+
     ret

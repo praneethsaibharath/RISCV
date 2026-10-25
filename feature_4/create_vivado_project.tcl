@@ -69,6 +69,7 @@ set MEM_FILES [list \
     [file join $SCRIPT_DIR "mem" "dmem.hex"] \
 ]
 add_files -norecurse -fileset sources_1 $MEM_FILES
+set_property file_type "Memory File" [get_files $MEM_FILES]
 
 # Add Simulation Sources & Testbenches
 set SIM_FILES [list \
@@ -97,6 +98,10 @@ set_property -name {xsim.simulate.runtime} -value {50000ns} -objects [get_filese
 # Set Top Module
 set_property top fpga_top_feature4 [current_fileset]
 update_compile_order -fileset sources_1
+
+# Pre-synthesis hook to ensure hex files are in synth_1 working directory
+set PRE_TCL [file join $SCRIPT_DIR "copy_hex.tcl"]
+set_property STEPS.SYNTH_DESIGN.TCL.PRE $PRE_TCL [get_runs synth_1]
 
 puts "=========================================================="
 puts " Feature 4 Vivado Project Successfully Created!"

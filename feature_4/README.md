@@ -140,7 +140,7 @@ feature_4/
 | **LED[5]** | `V17` | Divider Active Indicator (`div_active`) |
 | **LED[6]** | `U17` | **FPU Active Indicator (`fpu_active`)** |
 | **LED[7]** | `U16` | Program Execution Complete |
-| **LED[15:8]** | `V11..H6` | Low 8 bits of committed writeback result (`wb_data[7:0]`) |
+| **LED[15:8]** | `V11..V16` | Low 8 bits of committed writeback result (`wb_data[7:0]`) |
 | **7-Segment Display** | `J17..L18` | Displays PC (`sw[2]=0`) or Instruction Word (`sw[2]=1`) |
 | **sw[0]** | `J15` | Single-Step Clock Mode (`1` = manual step via `btnc`) |
 | **sw[1]** | `L16` | Slow Clock Mode (1 Hz) |

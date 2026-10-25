@@ -107,7 +107,7 @@ module tb_fpu_c_test;
         end
 
         // Load compiled C code
-        $readmemh("mem/imem.hex", imem);
+        $readmemh("imem.hex", imem); if (imem[0] === 32'h0000_0013 || imem[0] === 32'hx) $readmemh("mem/imem.hex", imem); if (imem[0] === 32'h0000_0013 || imem[0] === 32'hx) $readmemh("../mem/imem.hex", imem);
 
         reset_n = 0;
         #50;
@@ -269,7 +269,7 @@ module tb_fpu_c_test;
         $display(" RAM Signature [0x22C]       : 0x%08h (Expected: 0xCAFEFEED)", dmem[128 + 11]);
 
         if (fail_count == 0 && pass_count >= 12 && dmem[128 + 11] === 32'hcafefeed) begin
-            $display("\n >>> ALL ARITHMETIC OPERATIONS & SPECIAL CASES PASSED 100%! <<<");
+            $display("\n >>> ALL ARITHMETIC OPERATIONS & SPECIAL CASES PASSED 100%%! <<<");
         end else begin
             $display("\n >>> VERIFICATION FAILED! <<<");
         end

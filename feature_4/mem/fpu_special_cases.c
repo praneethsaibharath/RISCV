@@ -118,5 +118,5 @@ int main(void) {
     // Completion signature: 0xCAFEFEED indicates all tests passed successfully!
     mem_out[11]= 0xCAFEFEED;
 
-    return 0;
+    return 0x44; // Feature 4 signature (0x44 = 68) for FPGA LEDs[15:8]
 }

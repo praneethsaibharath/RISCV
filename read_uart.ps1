@@ -96,6 +96,33 @@ function Disassemble-RV32 {
         return "$($names[$funct3]) $rs1Name, $rs2Name"
     }
 
+    # OP-FP (0x53)
+    if ($opcode -eq 0x53) {
+        $fnames = switch ($funct7) {
+            0x00 { "fadd.s" }
+            0x04 { "fsub.s" }
+            0x10 { "fmul.s" }
+            0x0C { "fdiv.s" }
+            default { "fpu.op" }
+        }
+        return "$fnames $rdName, $rs1Name, $rs2Name"
+    }
+
+    # AUIPC (0x17)
+    if ($opcode -eq 0x17) {
+        return "auipc $rdName, 0x$(($inst -shr 12).ToString('x'))"
+    }
+
+    # JAL (0x6F)
+    if ($opcode -eq 0x6F) {
+        return "jal $rdName"
+    }
+
+    # JALR (0x67)
+    if ($opcode -eq 0x67) {
+        return "jalr $rdName, $rs1Name"
+    }
+
     # LUI (0x37)
     if ($opcode -eq 0x37) {
         return "lui $rdName, 0x$(($inst -shr 12).ToString('x'))"
@@ -334,3 +361,4 @@ try {
         Write-Host "`n[INFO] Closed serial connection to $Port." -ForegroundColor Gray
     }
 }
+

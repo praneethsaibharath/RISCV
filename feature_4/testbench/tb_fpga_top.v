@@ -29,13 +29,14 @@ module tb_fpga_top;
     fpga_top_feature4 dut (
         .clk_100mhz (clk_100mhz),
         .cpu_resetn (cpu_resetn),
-        .sw         (sw),
+        .sw         (sw[3:0]),
         .btnc       (btnc),
         .led        (led),
         .an         (an),
         .seg        (seg),
         .dp         (dp),
-        .uart_tx    (uart_tx)
+        .uart_tx    (uart_tx),
+        .uart_rx    (1'b1)
     );
 
     initial begin
@@ -47,7 +48,7 @@ module tb_fpga_top;
         // sw[0] = 0 (Auto step via UART synchronization)
         // sw[1] = 0 (Normal auto speed)
         // sw[2] = 0 (Display PC on 7-seg)
-        // sw[3] = 1 (DSP Multiplier mode)
+        // sw[3] = 1 (Booth Multiplier mode; 0 = DSP)
         sw = 16'b0000_0000_0000_1000;
         btnc = 0;
         cpu_resetn = 0;
@@ -58,7 +59,6 @@ module tb_fpga_top;
         cpu_resetn = 1;
         $display("[FPGA TB] Board released from reset, 100 MHz oscillator running.");
 
-        // Monitor program completion
         wait (led[7] == 1'b1);
         $display("[FPGA TB] Program Done Signal (LED[7]) ASSERTED at time %0t ns!", $time);
         $display("[FPGA TB] 7-Segment Anodes: 8'b%08b", an);
@@ -71,11 +71,15 @@ module tb_fpga_top;
         $finish;
     end
 
-    // Timeout watchdog
     initial begin
-        #50_000_000; // 50 ms timeout
-        $display("\n[FPGA TB] ERROR: Simulation timed out!");
+        #600_000_000; // 600 ms timeout
+        $display("\n[FPGA TB] ERROR: Simulation timed out at %0t! saw_ret=%b, prog_done=%b, post_ret_drain=%d, pc=%h", $time, dut.saw_ret, dut.prog_done, dut.post_ret_drain, dut.pc_if);
         $finish;
+    end
+
+    always @(posedge dut.core_clk) begin
+        $display("Time=%0t | PC=0x%08h | INST=0x%08h | WB_PC=0x%08h | WB_REG=%d | WB_DATA=0x%08h | FPU_BUSY=%b | HAZ_STALL=%b",
+                 $time, dut.pc_if, dut.imem_rdata, dut.pc_wb, dut.wb_dest_reg, dut.wb_data, dut.fpu_busy, dut.hazard_stall);
     end
 
 endmodule

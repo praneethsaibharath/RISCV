@@ -1,7 +1,7 @@
 // ============================================================================
 // File: memory.v
 // Description: Instruction Memory (IMEM) and Data Memory (DMEM) Models
-// Project: Pipelined RV32IM RISC-V Core (Feature 1: 5-Stage Upgrade)
+// Project: Pipelined RV32IMF RISC-V Core (Feature 4: IEEE 754 FPU)
 // ============================================================================
 
 `timescale 1ns/1ps
@@ -24,7 +24,11 @@ module instr_mem
     (* ram_style = "distributed" *)
     reg [31:0] imem [0:WORDS-1];
 
+    integer init_i;
     initial begin
+        for (init_i = 0; init_i < WORDS; init_i = init_i + 1) begin
+            imem[init_i] = 32'h0000_0013; // Default NOP
+        end
         $readmemh(HEX_FILE, imem);
         $display("[IMEM] Loaded instruction memory from: %s", HEX_FILE);
         $display("[IMEM] imem[0] = 0x%08h, imem[1] = 0x%08h", imem[0], imem[1]);
@@ -65,7 +69,11 @@ module data_mem
     wire [9:0] rindex = raddr[11:2];
     wire [9:0] windex = waddr[11:2];
 
+    integer init_j;
     initial begin
+        for (init_j = 0; init_j < WORDS; init_j = init_j + 1) begin
+            dmem[init_j] = 32'h0000_0000;
+        end
         $readmemh(HEX_FILE, dmem);
         $display("[DMEM] Loaded data memory from: %s", HEX_FILE);
     end

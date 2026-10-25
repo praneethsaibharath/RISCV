@@ -1,7 +1,7 @@
 ## ============================================================================
 ## File: nexys_a7_100t.xdc
 ## Board: Digilent Nexys A7-100T (Xilinx Artix-7 XC7A100T-1CSG324C)
-## Project: Feature 2 - Hardware Multiplier with DSP48E1 & Booth RTL
+## Project: Feature 4 - Pipelined RV32IMF Core with IEEE 754 FPU
 ## ============================================================================
 
 ## Clock signal (100 MHz oscillator & 50 MHz Derived Core Clock)
@@ -55,14 +55,15 @@ set_property -dict { PACKAGE_PIN K15   IOSTANDARD LVCMOS33 } [get_ports { led[1]
 set_property -dict { PACKAGE_PIN J13   IOSTANDARD LVCMOS33 } [get_ports { led[2] }];
 ## LED[3]: Instruction Writeback Commit LED
 set_property -dict { PACKAGE_PIN N14   IOSTANDARD LVCMOS33 } [get_ports { led[3] }];
-## LED[4]: Multiplier Unit Active LED
+## LED[4]: Multiplier Unit Active LED (MUL/MULH/FMUL)
 set_property -dict { PACKAGE_PIN R18   IOSTANDARD LVCMOS33 } [get_ports { led[4] }];
-## LED[5]: DSP Hardware Mode Active LED
+## LED[5]: Divider Unit Active LED (DIV/REM/FDIV)
 set_property -dict { PACKAGE_PIN V17   IOSTANDARD LVCMOS33 } [get_ports { led[5] }];
-## LED[7:6]: Forward B Code
+## LED[6]: FPU Unit Active LED (FADD.S/FSUB.S/FMUL.S/FDIV.S)
 set_property -dict { PACKAGE_PIN U17   IOSTANDARD LVCMOS33 } [get_ports { led[6] }];
+## LED[7]: Program Execution Completed (prog_done)
 set_property -dict { PACKAGE_PIN U16   IOSTANDARD LVCMOS33 } [get_ports { led[7] }];
-## LED[15:8]: Low byte of committed register result (wb_data[7:0])
+## LED[15:8]: Committed Result Low Byte / Return Value (wb_data[7:0] / final_result)
 set_property -dict { PACKAGE_PIN V16   IOSTANDARD LVCMOS33 } [get_ports { led[8]  }];
 set_property -dict { PACKAGE_PIN T15   IOSTANDARD LVCMOS33 } [get_ports { led[9]  }];
 set_property -dict { PACKAGE_PIN U14   IOSTANDARD LVCMOS33 } [get_ports { led[10] }];

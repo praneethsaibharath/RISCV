@@ -1,5 +1,5 @@
-; Disassembly of /Users/siddharthmisro/Documents/RISCV/asm_tests/04_fpu_special_cases.s
-; Total Instructions: 38
+; Disassembly of C:\RISCV\asm_tests\04_fpu_special_cases.s
+; Total Instructions: 39
 
 0x00000000:  3fc000b7    lui     x1, 0x3FC00         # x1  = 1.5f (0x3FC00000)
 0x00000004:  40200137    lui     x2, 0x40200         # x2  = 2.5f (0x40200000)
@@ -38,4 +38,5 @@
 0x00000088:  caff0c37    li      x24, 0xCAFEFEED
 0x0000008c:  eedc0c13    li      x24, 0xCAFEFEED
 0x00000090:  038ba623    sw      x24, 44(x23)        # RAM[0x22C] = 0xCAFEFEED
-0x00000094:  00008067    ret
+0x00000094:  04400513    li      x10, 0x44
+0x00000098:  00008067    ret
